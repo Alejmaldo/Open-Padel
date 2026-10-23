@@ -1,0 +1,3116 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pádel Open Master - Gestor de Jornadas & Ranking</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .court-pattern {
+            background-color: #0f172a;
+            background-image: radial-gradient(#1e293b 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        /* Sortable column cursor */
+        th.sortable { cursor: pointer; user-select: none; transition: background-color 0.15s ease; }
+        th.sortable:hover { background-color: rgba(51, 65, 85, 0.4); }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-lime-500 selection:text-slate-950">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-lime-500 to-emerald-400 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-lime-500/20 text-xl">
+                    🎾
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+                        PÁDEL OPEN MASTER
+                        <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-lime-500/10 text-lime-400 border border-lime-500/30">Pro Club</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium">Gestión en vivo, canchas abiertas y ranking acumulado</p>
+                </div>
+            </div>
+
+            <!-- Session Indicator Pill -->
+            <div id="header-session-pill" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                <span class="text-slate-300 font-semibold" id="header-session-text">Sin Jornada Activa</span>
+            </div>
+
+            <!-- Header Quick Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="openShareModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm active:scale-95" title="Compartir Reporte por WhatsApp">
+                    <span>📲</span>
+                    <span class="hidden sm:inline">Compartir WhatsApp</span>
+                </button>
+                <button onclick="openBackupModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition active:scale-95" title="Respaldo y Exportación">
+                    <span>💾</span>
+                    <span class="hidden sm:inline">Respaldos</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Live Session Banner -->
+    <div id="live-session-banner" class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border-b border-slate-800/80 py-3 px-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div id="session-banner-info" class="flex flex-wrap items-center gap-4 text-xs">
+                <!-- Injected via JavaScript -->
+            </div>
+            <div id="session-banner-actions" class="flex items-center gap-2 flex-wrap">
+                <!-- Injected via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-slate-900/60 border-b border-slate-800 px-4">
+        <div class="max-w-7xl mx-auto flex overflow-x-auto space-x-2 py-2 text-xs font-semibold">
+            <button id="tab-btn-canchas" onclick="switchTab('canchas')" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-xl transition bg-lime-500 text-slate-950 font-bold shadow-md shadow-lime-500/20">
+                <span>🏟️</span>
+                <span>Canchas & Partidos</span>
+                <span id="badge-active-matches" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-950 text-lime-400 text-[10px] font-black">0</span>
+            </button>
+            <button id="tab-btn-jugadores" onclick="switchTab('jugadores')" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                <span>👥</span>
+                <span>Jugadores & Espera</span>
+                <span id="badge-waiting-count" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">0</span>
+            </button>
+            <button id="tab-btn-ranking" onclick="switchTab('ranking')" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                <span>🏆</span>
+                <span>Ranking Mensual</span>
+            </button>
+            <button id="tab-btn-jornadas" onclick="switchTab('jornadas')" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                <span>📜</span>
+                <span>Historial de Jornadas</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+        <!-- ==============================================================
+             TAB 1: CANCHAS & PARTIDOS EN JUEGO
+             ============================================================== -->
+        <section id="tab-content-canchas" class="space-y-6">
+            <!-- Warning when no active session -->
+            <div id="no-session-alert" class="hidden bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 text-amber-300 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">⚠️</span>
+                    <span><b>Atención:</b> Debes iniciar una jornada antes de poder asignar o jugar partidos en las canchas.</span>
+                </div>
+                <button onclick="openStartSessionModal()" class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shrink-0">
+                    Iniciar Jornada
+                </button>
+            </div>
+
+            <!-- Courts Control Bar -->
+            <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium block">Canchas simultáneas habilitadas</span>
+                        <div class="flex items-center gap-2 mt-1">
+                            <button onclick="adjustCourts(-1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center transition border border-slate-700">-</button>
+                            <span id="court-count-display" class="font-black text-lime-400 text-lg w-8 text-center">2</span>
+                            <button onclick="adjustCourts(1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center transition border border-slate-700">+</button>
+                        </div>
+                    </div>
+                    <div class="h-8 w-px bg-slate-800 hidden sm:block"></div>
+                    <div class="text-xs space-y-1">
+                        <span class="text-slate-400 block font-medium">Modo de emparejamiento automático</span>
+                        <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                            <button onclick="setGenerationMode('LIBRE')" id="mode-btn-libre" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-lime-500 text-slate-950">Libre / Equitativo</button>
+                            <button onclick="setGenerationMode('MASCULINO')" id="mode-btn-masculino" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white">Masculino</button>
+                            <button onclick="setGenerationMode('FEMENINO')" id="mode-btn-femenino" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white">Femenino</button>
+                            <button onclick="setGenerationMode('MIXTO')" id="mode-btn-mixto" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white">Mixto</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="autoFillNextCourt()" class="px-4 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 font-black text-xs transition shadow-lg shadow-lime-500/10 active:scale-95 flex items-center gap-2">
+                        <span>⚡</span>
+                        <span>Asignar Automático</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Court Grid -->
+            <div id="courts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Dynamically generated court cards -->
+            </div>
+        </section>
+
+        <!-- ==============================================================
+             TAB 2: JUGADORES, COLA DE ESPERA & ESTADÍSTICAS EN VIVO
+             ============================================================== -->
+        <section id="tab-content-jugadores" class="hidden space-y-6">
+            <!-- Add Player & Filters Header -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Form Box -->
+                <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-sm space-y-4">
+                    <h2 class="text-sm font-bold uppercase tracking-wide text-white flex items-center gap-2">
+                        <span>➕</span> Inscribir Nuevo Jugador
+                    </h2>
+                    <form id="form-add-player" onsubmit="handleAddPlayer(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre y Apellido</label>
+                            <input type="text" id="player-name" required placeholder="Ej. Juan Pérez" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Género</label>
+                                <select id="player-gender" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                                    <option value="M">Masculino (H)</option>
+                                    <option value="F">Femenino (M)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Categoría</label>
+                                <select id="player-category" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                                    <option value="1">1ª Categoría</option>
+                                    <option value="2">2ª Categoría</option>
+                                    <option value="3">3ª Categoría</option>
+                                    <option value="4">4ª Categoría</option>
+                                    <option value="5">5ª Categoría</option>
+                                    <option value="6">6ª Categoría</option>
+                                    <option value="7" selected>7ª Categoría</option>
+                                    <option value="8">8ª Categoría</option>
+                                    <option value="9">9ª Categoría</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Subcategoría / Nivel</label>
+                            <select id="player-subcategory" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                                <option value="INICIAL">Inicial (Principiante)</option>
+                                <option value="INTERMEDIO" selected>Intermedio</option>
+                                <option value="AVANZADO">Avanzado</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 font-black text-xs transition shadow-md shadow-lime-500/10">
+                            Agregar Jugador
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Live Metrics & Balancing Box -->
+                <div class="lg:col-span-2 bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div>
+                            <h2 class="text-sm font-bold uppercase tracking-wide text-white flex items-center gap-2">
+                                <span>⚖️</span> Balance y Asistencia de la Jornada
+                            </h2>
+                            <p class="text-xs text-slate-400">Todos inician ausentes en una nueva jornada. Márcalos como <b>Presente</b> a medida que van llegando.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400 font-medium">Ver:</span>
+                            <select id="filter-player-presence" onchange="renderPlayersTable()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white">
+                                <option value="ALL">Todos los Jugadores</option>
+                                <option value="PRESENT" selected>Solo Presentes</option>
+                                <option value="DISABLED">Solo Ausentes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <span class="text-slate-400 text-[11px] block font-semibold">Total Padrón</span>
+                            <span id="metric-total-players" class="text-lg font-black text-white">0</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <span class="text-emerald-400 text-[11px] block font-semibold">En Cancha</span>
+                            <span id="metric-oncourt-players" class="text-lg font-black text-emerald-400">0</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <span class="text-amber-400 text-[11px] block font-semibold">Presentes en Espera</span>
+                            <span id="metric-waiting-players" class="text-lg font-black text-amber-400">0</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <span class="text-rose-400 text-[11px] block font-semibold">Ausentes Hoy</span>
+                            <span id="metric-inactive-players" class="text-lg font-black text-rose-400">0</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                        <span class="text-slate-300 font-medium">Equidad de Partidos Jugados (Dispersión):</span>
+                        <span id="metric-equity-tag" class="px-2.5 py-1 rounded-full text-[10px] font-black bg-lime-500/10 text-lime-400 border border-lime-500/30">Óptima (Todos parejos)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search and Filter Bar -->
+            <div class="bg-slate-900 rounded-2xl p-3 border border-slate-800 flex items-center gap-3">
+                <span class="text-slate-400 text-sm pl-2">🔍</span>
+                <input type="text" id="player-search-input" placeholder="Buscar jugador por nombre o categoría..." class="bg-transparent border-0 text-xs text-white focus:outline-none w-full placeholder:text-slate-500">
+            </div>
+
+            <!-- Players Table with Live Session Stats -->
+            <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
+                <div class="px-5 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/80">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">
+                            Jugadores & Estadísticas de la Jornada Actual
+                        </h3>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-[11px] font-semibold text-slate-400">Criterio Ranking Jornada:</label>
+                        <select id="session-ranking-criterion" onchange="renderPlayersTable()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-lime-500">
+                            <option value="PG" selected>Más Victorias (PG) ➔ Desempate % Vic</option>
+                            <option value="WINRATE">% de Victorias ➔ Desempate PG</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950/70 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800 font-bold">
+                            <tr>
+                                <th onclick="handleSortPlayers('rank')" class="sortable p-3 pl-5 text-center w-14">Rank <span id="sort-icon-players-rank">▲</span></th>
+                                <th onclick="handleSortPlayers('name')" class="sortable p-3">Jugador <span id="sort-icon-players-name"></span></th>
+                                <th onclick="handleSortPlayers('gender')" class="sortable p-3 text-center">Género <span id="sort-icon-players-gender"></span></th>
+                                <th onclick="handleSortPlayers('category')" class="sortable p-3 text-center">Categoría <span id="sort-icon-players-category"></span></th>
+                                <th onclick="handleSortPlayers('status')" class="sortable p-3 text-center">Asistencia <span id="sort-icon-players-status"></span></th>
+                                <th onclick="handleSortPlayers('pj')" class="sortable p-3 text-center bg-slate-900/80 text-lime-400">PJ Hoy <span id="sort-icon-players-pj"></span></th>
+                                <th onclick="handleSortPlayers('pg')" class="sortable p-3 text-center text-emerald-400 font-black">PG <span id="sort-icon-players-pg"></span></th>
+                                <th onclick="handleSortPlayers('pp')" class="sortable p-3 text-center">PP <span id="sort-icon-players-pp"></span></th>
+                                <th onclick="handleSortPlayers('winRate')" class="sortable p-3 text-center text-lime-400 font-black">% Vic <span id="sort-icon-players-winRate"></span></th>
+                                <th onclick="handleSortPlayers('diffGames')" class="sortable p-3 text-center">Dif Games <span id="sort-icon-players-diffGames"></span></th>
+                                <th onclick="handleSortPlayers('ptsHoy')" class="sortable p-3 text-center font-black text-amber-400">Pts Hoy <span id="sort-icon-players-ptsHoy"></span></th>
+                                <th onclick="handleSortPlayers('waitTurns')" class="sortable p-3 text-center">Turnos Fuera <span id="sort-icon-players-waitTurns"></span></th>
+                                <th class="p-3 pr-5 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="players-table-body" class="divide-y divide-slate-800/60 font-medium">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==============================================================
+             TAB 3: RANKING MENSUAL ACUMULATIVO
+             ============================================================== -->
+        <section id="tab-content-ranking" class="hidden space-y-6">
+            <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-black text-white flex items-center gap-2">
+                        <span>🏆</span> Ranking Acumulativo Oficial
+                    </h2>
+                    <p class="text-xs text-slate-400">Toca cualquier columna para ordenar. El puesto se mantiene estático correlativo (1º, 2º, 3º...) reflejando el orden seleccionado.</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- Base Ranking Criterion -->
+                    <select id="ranking-base-criterion" onchange="renderRankingTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white">
+                        <option value="PG" selected>Criterio: Victorias (PG)</option>
+                        <option value="WINRATE">Criterio: % Victorias</option>
+                        <option value="PJ">Criterio: Partidos (PJ)</option>
+                    </select>
+
+                    <!-- Month Filter -->
+                    <select id="ranking-month-select" onchange="renderRankingTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white">
+                        <option value="CURRENT_MONTH">Mes Actual</option>
+                        <option value="ALL_TIME">Histórico Total</option>
+                    </select>
+
+                    <!-- Jornada / Session Filter -->
+                    <select id="ranking-session-filter" onchange="renderRankingTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white">
+                        <option value="ALL">Todas las Jornadas</option>
+                        <!-- Injected dynamically with sessions -->
+                    </select>
+
+                    <!-- Category Filter -->
+                    <select id="ranking-category-filter" onchange="renderRankingTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white">
+                        <option value="ALL">Todas las Categorías</option>
+                        <option value="1">1ª Categoría</option>
+                        <option value="2">2ª Categoría</option>
+                        <option value="3">3ª Categoría</option>
+                        <option value="4">4ª Categoría</option>
+                        <option value="5">5ª Categoría</option>
+                        <option value="6">6ª Categoría</option>
+                        <option value="7">7ª Categoría</option>
+                        <option value="8">8ª Categoría</option>
+                        <option value="9">9ª Categoría</option>
+                    </select>
+
+                    <!-- Gender Filter -->
+                    <select id="ranking-gender-filter" onchange="renderRankingTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white">
+                        <option value="ALL">Todos los Géneros</option>
+                        <option value="M">Solo Masculino</option>
+                        <option value="F">Solo Femenino</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Ranking Table with Large Visible Badges -->
+            <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950/70 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800 font-bold">
+                            <tr>
+                                <th class="p-4 pl-5 w-16 text-center text-lime-400">Puesto</th>
+                                <th onclick="handleSortRanking('name')" class="sortable p-4">Jugador <span id="sort-icon-ranking-name"></span></th>
+                                <th onclick="handleSortRanking('category')" class="sortable p-4 text-center">Nivel / Cat <span id="sort-icon-ranking-category"></span></th>
+                                <th onclick="handleSortRanking('pj')" class="sortable p-4 text-center bg-slate-900/60 font-black text-white">Partidos (PJ) <span id="sort-icon-ranking-pj"></span></th>
+                                <th onclick="handleSortRanking('pg')" class="sortable p-4 text-center text-emerald-400 font-bold">PG <span id="sort-icon-ranking-pg"></span></th>
+                                <th onclick="handleSortRanking('pp')" class="sortable p-4 text-center text-rose-400 font-bold">PP <span id="sort-icon-ranking-pp"></span></th>
+                                <th onclick="handleSortRanking('winRate')" class="sortable p-4 text-center text-lime-400 font-black">% Victorias <span id="sort-icon-ranking-winRate"></span></th>
+                                <th onclick="handleSortRanking('games')" class="sortable p-4 text-center">Games (F/C) <span id="sort-icon-ranking-games"></span></th>
+                                <th onclick="handleSortRanking('diffGames')" class="sortable p-4 text-center">Dif Games <span id="sort-icon-ranking-diffGames"></span></th>
+                                <th onclick="handleSortRanking('points')" class="sortable p-4 pr-5 text-right font-black text-amber-400">Puntos Totales <span id="sort-icon-ranking-points"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ranking-table-body" class="divide-y divide-slate-800/60 font-medium">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==============================================================
+             TAB 4: HISTORIAL DE JORNADAS ARCHIVADAS
+             ============================================================== -->
+        <section id="tab-content-jornadas" class="hidden space-y-6">
+            <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-black text-white flex items-center gap-2">
+                        <span>📜</span> Historial de Jornadas Archivadas
+                    </h2>
+                    <p class="text-xs text-slate-400">Registro histórico con resultados, podio y opción para compartir por WhatsApp en cualquier momento.</p>
+                </div>
+            </div>
+
+            <div id="past-sessions-list" class="space-y-4">
+                <!-- Injected dynamically -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==============================================================
+         MODALS
+         ============================================================== -->
+
+    <!-- Modal: Asignar Cancha Manualmente -->
+    <div id="modal-assign-manual" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                    <span>🎾</span> Asignación Manual - Cancha #<span id="manual-court-number">1</span>
+                </h3>
+                <button onclick="closeModal('modal-assign-manual')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-300">
+                Selecciona manualmente a los 4 jugadores presentes para formar las dos parejas en esta cancha.
+            </p>
+            <form onsubmit="handleManualAssignSubmit(event)" class="space-y-4 text-xs">
+                <!-- Pareja 1 -->
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <span class="font-bold text-lime-400 block uppercase tracking-wider text-[11px]">🟢 Pareja 1</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 1A</label>
+                            <select id="manual-p0" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 1B</label>
+                            <select id="manual-p1" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pareja 2 -->
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <span class="font-bold text-amber-400 block uppercase tracking-wider text-[11px]">🟡 Pareja 2</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 2A</label>
+                            <select id="manual-p2" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 2B</label>
+                            <select id="manual-p3" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-assign-manual')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-xs font-black bg-lime-500 hover:bg-lime-400 text-slate-950">Comenzar Partido</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Iniciar Nueva Jornada -->
+    <div id="modal-start-session" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                    <span>🎾</span> Iniciar Nueva Jornada
+                </h3>
+                <button onclick="closeModal('modal-start-session')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+            <form onsubmit="handleStartSession(event)" class="space-y-3 overflow-y-auto pr-1">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre o Título de la Jornada</label>
+                    <input type="text" id="new-session-name" required placeholder="Ej. Abierto de Viernes Noche" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Lugar / Club / Sede</label>
+                    <input type="text" id="new-session-location" required placeholder="Ej. Club Pádel Central - Canchas 1 y 2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Fecha de Inicio</label>
+                        <input type="date" id="new-session-date" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Hora Estimada</label>
+                        <input type="time" id="new-session-time" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Cantidad Inicial de Canchas</label>
+                    <select id="new-session-courts" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                        <option value="1">1 Cancha</option>
+                        <option value="2" selected>2 Canchas</option>
+                        <option value="3">3 Canchas</option>
+                        <option value="4">4 Canchas</option>
+                        <option value="5">5 Canchas</option>
+                        <option value="6">6 Canchas</option>
+                    </select>
+                </div>
+
+                <!-- Selector de Jugadores Presentes al Iniciar -->
+                <div class="space-y-2 pt-2 border-t border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-lime-400 block">Marcar Jugadores Presentes Hoy:</label>
+                        <span id="session-selected-count" class="text-[11px] text-slate-400 font-semibold">0 seleccionados</span>
+                    </div>
+
+                    <!-- Buscador y botón para agregar nuevo jugador al vuelo -->
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="session-players-search" oninput="filterSessionModalPlayers()" placeholder="Buscar jugador..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-lime-500">
+                        <button type="button" onclick="toggleModalQuickAddPlayer()" class="px-2.5 py-1.5 rounded-lg bg-lime-500 hover:bg-lime-400 text-slate-950 font-black text-xs transition flex items-center gap-1 shrink-0">
+                            <span>➕</span> Nuevo
+                        </button>
+                    </div>
+
+                    <!-- Mini Formulario ocultable para agregar jugador nuevo dentro de la jornada -->
+                    <div id="quick-add-player-panel" class="hidden bg-slate-950 p-3 rounded-xl border border-lime-500/30 space-y-2">
+                        <span class="text-[11px] font-bold text-lime-400 block">Inscribir jugador e incluir como Presente:</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input type="text" id="quick-player-name" placeholder="Nombre y Apellido" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                            <select id="quick-player-gender" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                                <option value="M">Masculino (H)</option>
+                                <option value="F">Femenino (M)</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="quick-player-category" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                                <option value="1">1ª Categoría</option>
+                                <option value="2">2ª Categoría</option>
+                                <option value="3">3ª Categoría</option>
+                                <option value="4">4ª Categoría</option>
+                                <option value="5">5ª Categoría</option>
+                                <option value="6">6ª Categoría</option>
+                                <option value="7" selected>7ª Categoría</option>
+                                <option value="8">8ª Categoría</option>
+                                <option value="9">9ª Categoría</option>
+                            </select>
+                            <select id="quick-player-subcategory" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                                <option value="INICIAL">Inicial</option>
+                                <option value="INTERMEDIO" selected>Intermedio</option>
+                                <option value="AVANZADO">Avanzado</option>
+                            </select>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-1">
+                            <button type="button" onclick="toggleModalQuickAddPlayer()" class="px-3 py-1 rounded-lg text-xs bg-slate-800 text-slate-300">Cancelar</button>
+                            <button type="button" onclick="handleQuickAddPlayerSubmit()" class="px-3 py-1 rounded-lg text-xs font-bold bg-lime-500 text-slate-950">Guardar y Marcar</button>
+                        </div>
+                    </div>
+
+                    <div id="session-players-checklist" class="max-h-40 overflow-y-auto bg-slate-950 rounded-xl border border-slate-800 p-2 space-y-1 text-xs">
+                        <!-- Injected dynamically -->
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] text-slate-400">
+                        <button type="button" onclick="selectAllSessionModal(true)" class="text-lime-400 hover:underline">Marcar todos</button>
+                        <button type="button" onclick="selectAllSessionModal(false)" class="text-rose-400 hover:underline">Desmarcar todos</button>
+                    </div>
+                </div>
+
+                <div class="pt-3 flex justify-end gap-2 border-t border-slate-800">
+                    <button type="button" onclick="closeModal('modal-start-session')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-xs font-black bg-lime-500 hover:bg-lime-400 text-slate-950 shadow-md shadow-lime-500/20">Comenzar Jornada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Cerrar Jornada Actual -->
+    <div id="modal-close-session" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-black text-rose-400 flex items-center gap-2">
+                    <span>🏁</span> Finalizar y Guardar Jornada
+                </h3>
+                <button onclick="closeModal('modal-close-session')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Al cerrar la jornada, los partidos y estadísticas quedarán archivados en el historial permanente y el ranking acumulado del mes se actualizará. Los contadores de partidos jugados de hoy se reiniciarán para la próxima fecha.
+            </p>
+            <div id="close-session-summary-box" class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-1">
+                <!-- Injected dynamically -->
+            </div>
+            <div class="pt-2 flex justify-end gap-2">
+                <button type="button" onclick="closeModal('modal-close-session')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Continuar Jugando</button>
+                <button type="button" onclick="confirmCloseSession()" class="px-5 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20">Confirmar Cierre de Jornada</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Jugador Manualmente -->
+    <div id="modal-edit-player" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                    <span>✏️</span> Editar Jugador
+                </h3>
+                <button onclick="closeModal('modal-edit-player')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+            <form onsubmit="handleSavePlayerEdit(event)" class="space-y-3">
+                <input type="hidden" id="edit-player-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo</label>
+                    <input type="text" id="edit-player-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Género</label>
+                        <select id="edit-player-gender" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                            <option value="M">Masculino (H)</option>
+                            <option value="F">Femenino (M)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Categoría</label>
+                        <select id="edit-player-category" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                            <option value="1">1ª Categoría</option>
+                            <option value="2">2ª Categoría</option>
+                            <option value="3">3ª Categoría</option>
+                            <option value="4">4ª Categoría</option>
+                            <option value="5">5ª Categoría</option>
+                            <option value="6">6ª Categoría</option>
+                            <option value="7">7ª Categoría</option>
+                            <option value="8">8ª Categoría</option>
+                            <option value="9">9ª Categoría</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Subcategoría / Destreza</label>
+                    <select id="edit-player-subcategory" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                        <option value="INICIAL">Inicial</option>
+                        <option value="INTERMEDIO">Intermedio</option>
+                        <option value="AVANZADO">Avanzado</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Estado de Asistencia Hoy</label>
+                    <select id="edit-player-presence" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500">
+                        <option value="WAITING">Presente (En Espera para jugar)</option>
+                        <option value="RESTING">En Descanso Temporal</option>
+                        <option value="DISABLED">Ausente (No está en la jornada)</option>
+                    </select>
+                </div>
+                <div class="pt-3 flex justify-between items-center">
+                    <button type="button" onclick="requestDeletePlayerFromModal()" class="px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-950/40 border border-rose-900/40">
+                        Eliminar Jugador
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeModal('modal-edit-player')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Cancelar</button>
+                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-black bg-lime-500 hover:bg-lime-400 text-slate-950">Guardar Cambios</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Jugadores en Cancha Activa (Sustitución en Vivo) -->
+    <div id="modal-edit-court-match" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                    <span>🔄</span> Sustituir Jugador en Cancha #<span id="edit-court-number">1</span>
+                </h3>
+                <button onclick="closeModal('modal-edit-court-match')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-300">
+                Cambia cualquier integrante si te equivocaste de jugador o hubo una sustitución. Los sets y tanteador en curso se conservan intactos.
+            </p>
+            <div class="space-y-4 text-xs">
+                <!-- Pareja 1 -->
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <span class="font-bold text-lime-400 block uppercase tracking-wider text-[11px]">Pareja 1</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 1A</label>
+                            <select id="select-court-p0" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 1B</label>
+                            <select id="select-court-p1" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pareja 2 -->
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <span class="font-bold text-amber-400 block uppercase tracking-wider text-[11px]">Pareja 2</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 2A</label>
+                            <select id="select-court-p2" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">Jugador 2B</label>
+                            <select id="select-court-p3" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end gap-2">
+                <button type="button" onclick="closeModal('modal-edit-court-match')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Cancelar</button>
+                <button type="button" onclick="saveCourtSubstitutions()" class="px-5 py-2 rounded-xl text-xs font-black bg-lime-500 hover:bg-lime-400 text-slate-950">Aplicar Sustitución</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Compartir por WhatsApp y Reportes -->
+    <div id="modal-share-report" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                    <span>📲</span> Compartir Reporte por WhatsApp
+                </h3>
+                <button onclick="closeModal('modal-share-report')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+
+            <!-- Criterio para el armado del reporte en WhatsApp -->
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                <label class="text-[11px] font-bold text-lime-400 block uppercase tracking-wider">Criterio de Ranking a Compartir:</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-900 border border-slate-800 cursor-pointer">
+                        <input type="radio" name="share-ranking-criterion" value="PG" checked onchange="updateSharePreview()" class="text-lime-500">
+                        <span>🏆 <b>Victorias (PG)</b> <span class="text-[10px] text-slate-400 block">Desempate % Vic</span></span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-900 border border-slate-800 cursor-pointer">
+                        <input type="radio" name="share-ranking-criterion" value="WINRATE" onchange="updateSharePreview()" class="text-lime-500">
+                        <span>📈 <b>% de Victorias</b> <span class="text-[10px] text-slate-400 block">Desempate PG</span></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="space-y-2 text-xs">
+                <span id="share-modal-title-scope" class="font-bold text-slate-300 block">Selecciona el reporte:</span>
+                <div id="share-options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <!-- Injected dynamically based on context -->
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Vista Previa del Mensaje</label>
+                <textarea id="share-text-preview" rows="8" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed select-all focus:outline-none"></textarea>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+                <button type="button" onclick="copyShareText()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5">
+                    <span>📋</span> Copiar al Portapapeles
+                </button>
+                <button type="button" onclick="sendToWhatsAppDirect()" class="px-5 py-2 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 shadow-md shadow-emerald-500/20">
+                    <span>🚀</span> Abrir en WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ver Tabla Final de Jornada Archivada -->
+    <div id="modal-view-past-session" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div>
+                    <h3 id="view-past-session-title" class="text-base font-black text-white flex items-center gap-2">
+                        <span>📜</span> Tabla Final de Jornada
+                    </h3>
+                    <p id="view-past-session-meta" class="text-xs text-slate-400 mt-0.5"></p>
+                </div>
+                <button onclick="closeModal('modal-view-past-session')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+            
+            <div class="overflow-y-auto flex-1 border border-slate-800 rounded-xl">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800 font-bold sticky top-0">
+                        <tr>
+                            <th class="p-3 text-center w-12">Pos</th>
+                            <th class="p-3">Jugador</th>
+                            <th class="p-3 text-center">Nivel / Cat</th>
+                            <th class="p-3 text-center text-lime-400">PJ</th>
+                            <th class="p-3 text-center text-emerald-400">PG</th>
+                            <th class="p-3 text-center">PP</th>
+                            <th class="p-3 text-center">Dif Games</th>
+                            <th class="p-3 pr-4 text-right text-amber-400">Puntos</th>
+                        </tr>
+                    </thead>
+                    <tbody id="view-past-session-tbody" class="divide-y divide-slate-800/60 font-medium bg-slate-900/60">
+                        <!-- Injected dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pt-2 flex justify-between items-center">
+                <button id="view-past-session-share-btn" type="button" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 flex items-center gap-1.5 transition">
+                    <span>📲</span> Compartir WhatsApp
+                </button>
+                <button type="button" onclick="closeModal('modal-view-past-session')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Respaldos, Exportar JSON y CSV -->
+    <div id="modal-backup" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-black text-white flex items-center gap-2">
+                    <span>💾</span> Respaldo y Transferencia de Datos
+                </h3>
+                <button onclick="closeModal('modal-backup')" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Descarga una copia completa para guardarla en tu teléfono o transferirla a otro organizador sin perder nada.
+            </p>
+            <div class="space-y-3">
+                <button onclick="exportBackupJSON()" class="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-xs font-bold text-white transition">
+                    <span class="flex items-center gap-2"><span>📦</span> Descargar Copia Completa (.JSON)</span>
+                    <span class="text-lime-400">Descargar</span>
+                </button>
+                <button onclick="exportRankingCSV()" class="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-xs font-bold text-white transition">
+                    <span class="flex items-center gap-2"><span>📊</span> Exportar Ranking a Excel (.CSV)</span>
+                    <span class="text-lime-400">Exportar</span>
+                </button>
+                <div class="pt-2 border-t border-slate-800">
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">Restaurar Copia de Seguridad</label>
+                    <input type="file" id="import-file-input" accept=".json" onchange="importBackupJSON(event)" class="text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-lime-500 file:text-slate-950 hover:file:bg-lime-400 cursor-pointer">
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end">
+                <button type="button" onclick="closeModal('modal-backup')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmación Genérica -->
+    <div id="modal-confirm-dialog" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <h3 id="confirm-dialog-title" class="text-sm font-black text-white">Confirmar Acción</h3>
+            <p id="confirm-dialog-message" class="text-xs text-slate-300"></p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button id="confirm-dialog-cancel" type="button" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">Cancelar</button>
+                <button id="confirm-dialog-btn" type="button" class="px-4 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Box -->
+    <div id="toast-box" class="fixed bottom-5 right-5 z-50 transform transition-all duration-300 translate-y-20 opacity-0 pointer-events-none bg-slate-900 border border-lime-500/40 text-slate-100 text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2">
+        <span id="toast-icon">✅</span>
+        <span id="toast-text" class="font-semibold">Mensaje de notificación</span>
+    </div>
+
+    <!-- ==============================================================
+         CORE JAVASCRIPT APPLICATION LOGIC
+         ============================================================== -->
+    <script>
+        (function() {
+            /* -------------------------------------------------------------
+               APPLICATION STATE & PERSISTENCE
+               ------------------------------------------------------------- */
+            const STORAGE_KEY = 'PADEL_OPEN_MASTER_V2';
+
+            let state = {
+                activeSession: null,
+                courtCount: 2,
+                matchGenerationMode: 'LIBRE',
+                players: [],
+                activeMatches: {},
+                history: [],
+                pastSessions: []
+            };
+
+            let manualTargetCourtId = null;
+            let editingCourtId = null;
+            let currentShareMode = 'TOP_BAR'; // 'TOP_BAR' or 'PAST_SESSION'
+            let selectedPastSessionId = null;
+
+            // Persistent set for modal player selection across searches
+            let sessionModalSelectedPlayerIds = new Set();
+
+            // Table Sorting State
+            let playersSort = { field: 'rank', direction: 'asc' }; // rank, name, gender, category, status, pj, pg, pp, winRate, diffGames, ptsHoy, waitTurns
+            let rankingSort = { field: 'default', direction: 'asc' }; // default, name, category, pj, pg, pp, winRate, games, diffGames, points
+
+            function getSkillScore(category, subcat) {
+                const catVal = parseInt(category, 10) || 7;
+                let subOffset = 1;
+                if (subcat === 'AVANZADO') subOffset = 0;
+                if (subcat === 'INICIAL') subOffset = 2;
+                return (catVal - 1) * 3 + subOffset;
+            }
+
+            window.addEventListener('DOMContentLoaded', () => {
+                loadState();
+                ensureCourtsInitialized();
+                setupFilterListeners();
+                renderAll();
+                startSessionDurationTicker();
+            });
+
+            function setupFilterListeners() {
+                // Presence filter listener
+                const filterPresence = document.getElementById('filter-player-presence');
+                if (filterPresence) {
+                    filterPresence.addEventListener('change', () => {
+                        renderPlayersTable();
+                    });
+                }
+
+                // Player search input listener
+                const searchInput = document.getElementById('player-search-input');
+                if (searchInput) {
+                    searchInput.addEventListener('input', () => {
+                        renderPlayersTable();
+                    });
+                }
+
+                // Ranking filter listeners
+                ['ranking-month-select', 'ranking-session-filter', 'ranking-category-filter', 'ranking-gender-filter'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('change', () => {
+                            renderRankingTable();
+                        });
+                    }
+                });
+            }
+
+            function loadState() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        state = Object.assign(state, parsed);
+                    }
+                } catch (e) {
+                    console.error("Error al cargar localStorage:", e);
+                }
+            }
+
+            function saveState() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                } catch (e) {
+                    console.error("Error al guardar en localStorage:", e);
+                }
+            }
+
+            function ensureCourtsInitialized() {
+                const count = state.activeSession ? state.activeSession.courtCount : state.courtCount;
+                for (let i = 1; i <= count; i++) {
+                    if (!state.activeMatches[i]) {
+                        state.activeMatches[i] = null;
+                    }
+                }
+            }
+
+            /* -------------------------------------------------------------
+               GLOBAL RENDERING CONTROLLER
+               ------------------------------------------------------------- */
+            function renderAll() {
+                renderSessionBanner();
+                populateSessionFilterOptions();
+                renderCourts();
+                renderPlayersTable();
+                renderRankingTable();
+                renderPastSessions();
+                updateHeaderCounts();
+            }
+
+            function updateHeaderCounts() {
+                const activeCount = Object.values(state.activeMatches).filter(m => m !== null).length;
+                const waitingCount = state.players.filter(p => p.status === 'WAITING').length;
+                
+                const mBadge = document.getElementById('badge-active-matches');
+                const wBadge = document.getElementById('badge-waiting-count');
+                if (mBadge) mBadge.textContent = activeCount;
+                if (wBadge) wBadge.textContent = waitingCount;
+
+                const courtDisplay = document.getElementById('court-count-display');
+                if (courtDisplay) courtDisplay.textContent = state.activeSession ? state.activeSession.courtCount : state.courtCount;
+            }
+
+            /* -------------------------------------------------------------
+               SESSION MANAGEMENT
+               ------------------------------------------------------------- */
+            function renderSessionBanner() {
+                const bannerInfo = document.getElementById('session-banner-info');
+                const bannerActions = document.getElementById('session-banner-actions');
+                const headerPill = document.getElementById('header-session-pill');
+                const headerText = document.getElementById('header-session-text');
+                const noSessionAlert = document.getElementById('no-session-alert');
+
+                if (!bannerInfo || !bannerActions) return;
+
+                if (!state.activeSession) {
+                    if (headerPill) headerPill.className = "flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs";
+                    if (headerText) headerText.textContent = "Sin Jornada Activa";
+                    if (noSessionAlert) noSessionAlert.classList.remove('hidden');
+
+                    bannerInfo.innerHTML = `
+                        <div class="flex items-center gap-2 text-slate-300">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                            <span class="font-bold text-white">No hay una jornada abierta en este momento.</span>
+                            <span class="hidden sm:inline text-slate-400">Inicia una jornada para habilitar la asignación de partidos.</span>
+                        </div>
+                    `;
+                    bannerActions.innerHTML = `
+                        <button onclick="openStartSessionModal()" class="px-4 py-2 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 font-black text-xs transition shadow-md shadow-lime-500/20 active:scale-95 flex items-center gap-1.5">
+                            <span>🚀</span> Iniciar Nueva Jornada
+                        </button>
+                    `;
+                } else {
+                    if (headerPill) headerPill.className = "flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-950/80 border border-lime-500/40 text-xs";
+                    if (headerText) headerText.textContent = `En Juego: ${state.activeSession.name}`;
+                    if (noSessionAlert) noSessionAlert.classList.add('hidden');
+
+                    const dateFormatted = new Date(state.activeSession.startTime).toLocaleDateString([], { day: '2-digit', month: 'short' });
+                    const matchCount = state.history.filter(m => m.sessionId === state.activeSession.id).length;
+
+                    bannerInfo.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-lime-400 animate-pulse"></span>
+                            <span class="font-black text-white text-sm">${state.activeSession.name}</span>
+                        </div>
+                        <div class="flex items-center gap-1 text-slate-300">
+                            <span>📍</span> <span>${state.activeSession.location}</span>
+                        </div>
+                        <div class="flex items-center gap-1 text-slate-400">
+                            <span>📅</span> <span>${dateFormatted}</span>
+                        </div>
+                        <div class="flex items-center gap-1 text-lime-400 font-bold bg-lime-950/60 px-2 py-0.5 rounded-md border border-lime-500/30">
+                            <span>⏱️</span> <span id="session-live-ticker">00:00:00</span>
+                        </div>
+                        <div class="text-slate-400">
+                            Partidos finalizados hoy: <b class="text-white">${matchCount}</b>
+                        </div>
+                    `;
+
+                    bannerActions.innerHTML = `
+                        <button onclick="openCloseSessionModal()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition shadow-md shadow-rose-600/20 active:scale-95 flex items-center gap-1.5">
+                            <span>🏁</span> Finalizar Jornada
+                        </button>
+                    `;
+                }
+            }
+
+            function startSessionDurationTicker() {
+                setInterval(() => {
+                    if (state.activeSession) {
+                        const ticker = document.getElementById('session-live-ticker');
+                        if (ticker) {
+                            const diff = Math.max(0, Date.now() - state.activeSession.startTime);
+                            const hrs = Math.floor(diff / 3600000).toString().padStart(2, '0');
+                            const mins = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+                            const secs = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+                            ticker.textContent = `${hrs}:${mins}:${secs}`;
+                        }
+                    }
+                }, 1000);
+            }
+
+            window.openStartSessionModal = function() {
+                const now = new Date();
+                const dInput = document.getElementById('new-session-date');
+                const tInput = document.getElementById('new-session-time');
+                if (dInput) dInput.value = now.toISOString().split('T')[0];
+                if (tInput) tInput.value = now.toTimeString().substring(0, 5);
+
+                const searchInp = document.getElementById('session-players-search');
+                if (searchInp) searchInp.value = '';
+
+                const quickPanel = document.getElementById('quick-add-player-panel');
+                if (quickPanel) quickPanel.classList.add('hidden');
+
+                // Initialize selection state: by default empty for new session
+                sessionModalSelectedPlayerIds.clear();
+
+                renderSessionModalPlayersChecklist();
+                openModal('modal-start-session');
+            };
+
+            window.toggleModalQuickAddPlayer = function() {
+                const panel = document.getElementById('quick-add-player-panel');
+                if (!panel) return;
+                panel.classList.toggle('hidden');
+                if (!panel.classList.contains('hidden')) {
+                    const searchVal = document.getElementById('session-players-search')?.value.trim() || '';
+                    const quickNameInput = document.getElementById('quick-player-name');
+                    if (quickNameInput && searchVal) {
+                        quickNameInput.value = searchVal;
+                    }
+                    quickNameInput?.focus();
+                }
+            };
+
+            window.handleQuickAddPlayerSubmit = function() {
+                const nameInput = document.getElementById('quick-player-name');
+                const name = nameInput.value.trim();
+                const gender = document.getElementById('quick-player-gender').value;
+                const category = parseInt(document.getElementById('quick-player-category').value, 10);
+                const subcategory = document.getElementById('quick-player-subcategory').value;
+
+                if (!name) {
+                    showToast("Ingresa el nombre del nuevo jugador.", "⚠️");
+                    return;
+                }
+
+                // Check duplicate
+                const isDuplicate = state.players.some(p => p.name.trim().toLowerCase() === name.toLowerCase());
+                if (isDuplicate) {
+                    showToast(`Ya existe un jugador registrado con el nombre "${name}".`, "⚠️");
+                    return;
+                }
+
+                const newPlayer = {
+                    id: 'p_' + Date.now(),
+                    name,
+                    gender,
+                    category,
+                    subcategory,
+                    status: 'WAITING',
+                    waitTurns: 0,
+                    sessionMatchesPlayed: 0,
+                    sessionMatchesWon: 0,
+                    sessionGamesWon: 0,
+                    sessionGamesLost: 0,
+                    totalMatches: 0,
+                    matchesWon: 0,
+                    gamesWon: 0,
+                    gamesLost: 0
+                };
+
+                state.players.push(newPlayer);
+                sessionModalSelectedPlayerIds.add(newPlayer.id);
+
+                nameInput.value = '';
+                document.getElementById('quick-add-player-panel').classList.add('hidden');
+                document.getElementById('session-players-search').value = '';
+
+                saveState();
+                renderSessionModalPlayersChecklist();
+                showToast(`${name} inscrito y marcado como Presente.`, "👤");
+            };
+
+            function renderSessionModalPlayersChecklist() {
+                const container = document.getElementById('session-players-checklist');
+                if (!container) return;
+
+                if (state.players.length === 0) {
+                    container.innerHTML = `<p class="text-slate-500 text-center py-3">No hay jugadores registrados en el padrón todavía.</p>`;
+                    updateSessionModalSelectedCount();
+                    return;
+                }
+
+                const query = (document.getElementById('session-players-search')?.value || '').toLowerCase().trim();
+                let filtered = state.players;
+                if (query) {
+                    filtered = filtered.filter(p => p.name.toLowerCase().includes(query) || `${p.category}`.includes(query));
+                }
+
+                container.innerHTML = filtered.map(p => {
+                    const isChecked = sessionModalSelectedPlayerIds.has(p.id);
+                    return `
+                    <label class="flex items-center justify-between p-2 rounded-lg bg-slate-900 hover:bg-slate-800/80 cursor-pointer">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" name="session-player-chk" value="${p.id}" ${isChecked ? 'checked' : ''} onchange="toggleSessionModalPlayer('${p.id}', this.checked)" class="rounded text-lime-500 bg-slate-950 border-slate-700">
+                            <span class="font-medium text-white">${p.name}</span>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold border border-slate-700">
+                            ${p.category}ª ${p.gender === 'M' ? 'H' : 'M'}
+                        </span>
+                    </label>
+                    `;
+                }).join('');
+
+                updateSessionModalSelectedCount();
+            }
+
+            window.toggleSessionModalPlayer = function(playerId, isChecked) {
+                if (isChecked) {
+                    sessionModalSelectedPlayerIds.add(playerId);
+                } else {
+                    sessionModalSelectedPlayerIds.delete(playerId);
+                }
+                updateSessionModalSelectedCount();
+            };
+
+            window.filterSessionModalPlayers = function() {
+                renderSessionModalPlayersChecklist();
+            };
+
+            window.selectAllSessionModal = function(markAll) {
+                if (markAll) {
+                    state.players.forEach(p => sessionModalSelectedPlayerIds.add(p.id));
+                } else {
+                    sessionModalSelectedPlayerIds.clear();
+                }
+                renderSessionModalPlayersChecklist();
+            };
+
+            window.updateSessionModalSelectedCount = function() {
+                const countEl = document.getElementById('session-selected-count');
+                if (countEl) countEl.textContent = `${sessionModalSelectedPlayerIds.size} seleccionados`;
+            };
+
+            window.handleStartSession = function(e) {
+                e.preventDefault();
+                const name = document.getElementById('new-session-name').value.trim();
+                const location = document.getElementById('new-session-location').value.trim();
+                const courts = parseInt(document.getElementById('new-session-courts').value, 10) || 2;
+
+                const checkedPlayerIds = Array.from(sessionModalSelectedPlayerIds);
+
+                state.activeSession = {
+                    id: 'sess_' + Date.now(),
+                    name,
+                    location,
+                    startTime: Date.now(),
+                    courtCount: courts
+                };
+                state.courtCount = courts;
+
+                // Mark selected as WAITING (Presente), others as DISABLED (Ausente)
+                state.players.forEach(p => {
+                    if (checkedPlayerIds.includes(p.id)) {
+                        p.status = 'WAITING'; // Presente
+                    } else {
+                        p.status = 'DISABLED'; // Ausente
+                    }
+                    p.sessionMatchesPlayed = 0;
+                    p.sessionMatchesWon = 0;
+                    p.sessionGamesWon = 0;
+                    p.sessionGamesLost = 0;
+                    p.waitTurns = 0;
+                });
+
+                state.activeMatches = {};
+                ensureCourtsInitialized();
+
+                saveState();
+                closeModal('modal-start-session');
+                renderAll();
+                showToast(`Jornada iniciada con ${checkedPlayerIds.length} jugadores presentes.`, "🎾");
+            };
+
+            window.openCloseSessionModal = function() {
+                if (!state.activeSession) return;
+                const matchCount = state.history.filter(m => m.sessionId === state.activeSession.id).length;
+                const playersCount = state.players.filter(p => (p.sessionMatchesPlayed || 0) > 0).length;
+
+                const summaryBox = document.getElementById('close-session-summary-box');
+                if (summaryBox) {
+                    summaryBox.innerHTML = `
+                        <div class="flex justify-between text-slate-300"><span>Jornada:</span> <b class="text-white">${state.activeSession.name}</b></div>
+                        <div class="flex justify-between text-slate-300"><span>Club:</span> <b class="text-white">${state.activeSession.location}</b></div>
+                        <div class="flex justify-between text-slate-300"><span>Partidos cerrados hoy:</span> <b class="text-lime-400 font-bold">${matchCount}</b></div>
+                        <div class="flex justify-between text-slate-300"><span>Jugadores que participaron:</span> <b class="text-white">${playersCount}</b></div>
+                    `;
+                }
+                openModal('modal-close-session');
+            };
+
+            window.confirmCloseSession = function() {
+                if (!state.activeSession) return;
+
+                const sess = state.activeSession;
+                const matchCount = state.history.filter(m => m.sessionId === sess.id).length;
+
+                // Solo archivar a jugadores que estuvieron presentes (WAITING, PLAYING, RESTING) o que jugaron partidos
+                const activeParticipants = state.players
+                    .filter(p => p.status !== 'DISABLED' || (p.sessionMatchesPlayed || 0) > 0)
+                    .map(p => {
+                        const pj = p.sessionMatchesPlayed || 0;
+                        const pg = p.sessionMatchesWon || 0;
+                        const pp = pj - pg;
+                        const diffGames = (p.sessionGamesWon || 0) - (p.sessionGamesLost || 0);
+                        const winRate = pj > 0 ? Math.round((pg / pj) * 100) : 0;
+                        const points = pg * 3 + pp * 1;
+                        return {
+                            id: p.id,
+                            name: p.name,
+                            gender: p.gender,
+                            category: p.category,
+                            subcategory: p.subcategory,
+                            pj,
+                            pg,
+                            pp,
+                            winRate,
+                            diffGames,
+                            points
+                        };
+                    });
+
+                const sessionArchive = {
+                    ...sess,
+                    endTime: Date.now(),
+                    totalMatches: matchCount,
+                    participants: activeParticipants
+                };
+
+                state.pastSessions.unshift(sessionArchive);
+                state.activeSession = null;
+                state.activeMatches = {};
+                ensureCourtsInitialized();
+
+                state.players.forEach(p => {
+                    p.status = 'DISABLED';
+                    p.sessionMatchesPlayed = 0;
+                    p.sessionMatchesWon = 0;
+                    p.sessionGamesWon = 0;
+                    p.sessionGamesLost = 0;
+                    p.waitTurns = 0;
+                });
+
+                saveState();
+                closeModal('modal-close-session');
+                renderAll();
+                showToast("Jornada cerrada. Solo los presentes quedaron guardados en la tabla.", "🏁");
+            };
+
+            /* -------------------------------------------------------------
+               COURTS & MATCHES MANAGEMENT
+               ------------------------------------------------------------- */
+            window.adjustCourts = function(delta) {
+                let current = state.activeSession ? state.activeSession.courtCount : state.courtCount;
+                let next = current + delta;
+                if (next < 1) next = 1;
+                if (next > 12) next = 12;
+
+                if (state.activeSession) state.activeSession.courtCount = next;
+                state.courtCount = next;
+
+                ensureCourtsInitialized();
+                saveState();
+                renderCourts();
+                updateHeaderCounts();
+            };
+
+            window.setGenerationMode = function(mode) {
+                state.matchGenerationMode = mode;
+                ['LIBRE', 'MASCULINO', 'FEMENINO', 'MIXTO'].forEach(m => {
+                    const btn = document.getElementById(`mode-btn-${m.toLowerCase()}`);
+                    if (btn) {
+                        if (m === mode) {
+                            btn.className = "px-2.5 py-1 rounded-lg text-[11px] font-bold bg-lime-500 text-slate-950";
+                        } else {
+                            btn.className = "px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white";
+                        }
+                    }
+                });
+            };
+
+            function renderCourts() {
+                const container = document.getElementById('courts-grid');
+                if (!container) return;
+                container.innerHTML = '';
+
+                const totalCourts = state.activeSession ? state.activeSession.courtCount : state.courtCount;
+
+                for (let i = 1; i <= totalCourts; i++) {
+                    const match = state.activeMatches[i];
+                    const isOccupied = !!match;
+
+                    let cardHtml = '';
+                    if (!isOccupied) {
+                        cardHtml = `
+                            <div class="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 flex flex-col justify-between h-72 court-pattern relative">
+                                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                                    <span class="font-black text-sm text-slate-300 flex items-center gap-1.5">
+                                        <span>🏟️</span> CANCHA #${i}
+                                    </span>
+                                    <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                                        LIBRE
+                                    </span>
+                                </div>
+                                <div class="text-center py-6 space-y-2">
+                                    <span class="text-3xl block opacity-40">🎾</span>
+                                    <p class="text-xs text-slate-400">Cancha disponible para ingresar nuevo partido.</p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="openManualAssignModal(${i})" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-lime-400 font-bold text-xs border border-lime-500/30 transition active:scale-95 flex items-center justify-center gap-1">
+                                        <span>✏️</span> Manual
+                                    </button>
+                                    <button onclick="fillCourt(${i})" class="py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 font-black text-xs transition shadow-md shadow-lime-500/10 active:scale-95 flex items-center justify-center gap-1">
+                                        <span>⚡</span> Auto
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        const p0 = match.team1[0];
+                        const p1 = match.team1[1];
+                        const p2 = match.team2[0];
+                        const p3 = match.team2[1];
+
+                        let setsRowsHtml = '';
+                        match.sets.forEach((set, sIdx) => {
+                            setsRowsHtml += `
+                                <div class="flex items-center justify-between gap-2 py-1 border-b border-slate-800/60 text-xs">
+                                    <span class="text-[11px] font-bold text-slate-400 w-12">Set ${sIdx + 1}</span>
+                                    <div class="flex items-center gap-2">
+                                        <select onchange="updateSetScore(${i}, ${sIdx}, 1, this.value)" class="bg-slate-950 border border-slate-700 font-black text-lime-400 rounded-lg px-2 py-1 text-center text-xs">
+                                            ${[0,1,2,3,4,5,6,7].map(g => `<option value="${g}" ${set.team1 === g ? 'selected' : ''}>${g}</option>`).join('')}
+                                        </select>
+                                        <span class="text-slate-600 font-bold">-</span>
+                                        <select onchange="updateSetScore(${i}, ${sIdx}, 2, this.value)" class="bg-slate-950 border border-slate-700 font-black text-amber-400 rounded-lg px-2 py-1 text-center text-xs">
+                                            ${[0,1,2,3,4,5,6,7].map(g => `<option value="${g}" ${set.team2 === g ? 'selected' : ''}>${g}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div class="w-6 text-right">
+                                        ${match.sets.length > 1 ? `<button onclick="removeSetFromCourt(${i}, ${sIdx})" class="text-rose-400 hover:text-rose-300 font-bold text-xs" title="Eliminar Set">&times;</button>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        });
+
+                        cardHtml = `
+                            <div class="bg-slate-900 rounded-2xl p-5 border border-lime-500/40 shadow-xl shadow-lime-500/5 relative flex flex-col justify-between space-y-4">
+                                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                                    <span class="font-black text-sm text-lime-400 flex items-center gap-1.5">
+                                        <span>🏟️</span> CANCHA #${i}
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="openCourtEditModal(${i})" class="text-[10px] font-bold text-slate-300 hover:text-white bg-slate-800 px-2 py-1 rounded-lg border border-slate-700" title="Sustituir o corregir jugadores">
+                                            ✏️ Cambiar Jugadores
+                                        </button>
+                                        <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-lime-950 text-lime-400 border border-lime-500/40 animate-pulse">
+                                            EN JUEGO
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Teams Display -->
+                                <div class="grid grid-cols-2 gap-3 text-xs">
+                                    <!-- Team 1 -->
+                                    <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
+                                        <div class="flex items-center justify-between text-lime-400 font-bold uppercase text-[10px]">
+                                            <span>Pareja 1</span>
+                                            <span>🟢</span>
+                                        </div>
+                                        <p class="font-bold text-white truncate cursor-pointer hover:underline" onclick="openCourtEditModal(${i})">${p0.name}</p>
+                                        <p class="font-bold text-white truncate cursor-pointer hover:underline" onclick="openCourtEditModal(${i})">${p1.name}</p>
+                                    </div>
+
+                                    <!-- Team 2 -->
+                                    <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
+                                        <div class="flex items-center justify-between text-amber-400 font-bold uppercase text-[10px]">
+                                            <span>Pareja 2</span>
+                                            <span>🟡</span>
+                                        </div>
+                                        <p class="font-bold text-white truncate cursor-pointer hover:underline" onclick="openCourtEditModal(${i})">${p2.name}</p>
+                                        <p class="font-bold text-white truncate cursor-pointer hover:underline" onclick="openCourtEditModal(${i})">${p3.name}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Sets Control -->
+                                <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                                    <div class="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase pb-1 border-b border-slate-800">
+                                        <span>Marcador</span>
+                                        <button onclick="addSetToCourt(${i})" class="text-lime-400 hover:text-lime-300 font-bold">
+                                            + Agregar Set
+                                        </button>
+                                    </div>
+                                    ${setsRowsHtml}
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex gap-2 pt-1">
+                                    <button onclick="cancelCourtMatch(${i})" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition">
+                                        Anular
+                                    </button>
+                                    <button onclick="finishCourtMatch(${i})" class="flex-1 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 font-black text-xs transition shadow-md shadow-lime-500/20 active:scale-95">
+                                        ✅ Finalizar & Computar
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    container.innerHTML += cardHtml;
+                }
+            }
+
+            window.updateSetScore = function(courtId, setIndex, teamNum, val) {
+                const match = state.activeMatches[courtId];
+                if (!match || !match.sets[setIndex]) return;
+                const score = parseInt(val, 10) || 0;
+                if (teamNum === 1) match.sets[setIndex].team1 = score;
+                if (teamNum === 2) match.sets[setIndex].team2 = score;
+                saveState();
+            };
+
+            window.addSetToCourt = function(courtId) {
+                const match = state.activeMatches[courtId];
+                if (!match) return;
+                if (match.sets.length >= 5) {
+                    showToast("Máximo 5 sets por partido", "⚠️");
+                    return;
+                }
+                match.sets.push({ team1: 0, team2: 0 });
+                saveState();
+                renderCourts();
+            };
+
+            window.removeSetFromCourt = function(courtId, setIndex) {
+                const match = state.activeMatches[courtId];
+                if (!match || match.sets.length <= 1) return;
+                match.sets.splice(setIndex, 1);
+                saveState();
+                renderCourts();
+            };
+
+            /* -------------------------------------------------------------
+               MANUAL COURT ASSIGNMENT
+               ------------------------------------------------------------- */
+            window.openManualAssignModal = function(courtId) {
+                if (!state.activeSession) {
+                    showToast("Debes iniciar una jornada antes de poder asignar canchas.", "⚠️");
+                    openStartSessionModal();
+                    return;
+                }
+
+                manualTargetCourtId = courtId;
+                document.getElementById('manual-court-number').textContent = courtId;
+
+                const eligible = state.players.filter(p => p.status === 'WAITING');
+                if (eligible.length < 4) {
+                    showToast(`Necesitas al menos 4 jugadores presentes en espera (hay ${eligible.length}).`, "⚠️");
+                    return;
+                }
+
+                const populate = (selId, defaultIdx) => {
+                    const sel = document.getElementById(selId);
+                    if (!sel) return;
+                    sel.innerHTML = eligible.map((p, idx) => `
+                        <option value="${p.id}" ${idx === defaultIdx ? 'selected' : ''}>
+                            ${p.name} (${p.category}ª ${p.subcategory.substring(0,4)}.) - PJ:${p.sessionMatchesPlayed || 0}
+                        </option>
+                    `).join('');
+                };
+
+                populate('manual-p0', 0);
+                populate('manual-p1', 1);
+                populate('manual-p2', 2);
+                populate('manual-p3', 3);
+
+                openModal('modal-assign-manual');
+            };
+
+            window.handleManualAssignSubmit = function(e) {
+                e.preventDefault();
+                if (!manualTargetCourtId) return;
+
+                const id0 = document.getElementById('manual-p0').value;
+                const id1 = document.getElementById('manual-p1').value;
+                const id2 = document.getElementById('manual-p2').value;
+                const id3 = document.getElementById('manual-p3').value;
+
+                const ids = [id0, id1, id2, id3];
+                if (new Set(ids).size !== 4) {
+                    showToast("No puedes seleccionar al mismo jugador más de una vez.", "⚠️");
+                    return;
+                }
+
+                const p0 = state.players.find(x => x.id === id0);
+                const p1 = state.players.find(x => x.id === id1);
+                const p2 = state.players.find(x => x.id === id2);
+                const p3 = state.players.find(x => x.id === id3);
+
+                [p0, p1, p2, p3].forEach(p => {
+                    if (p) {
+                        p.status = 'PLAYING';
+                        p.waitTurns = 0;
+                    }
+                });
+
+                state.players.forEach(p => {
+                    if (p.status === 'WAITING' && !ids.includes(p.id)) {
+                        p.waitTurns = (p.waitTurns || 0) + 1;
+                    }
+                });
+
+                state.activeMatches[manualTargetCourtId] = {
+                    courtId: manualTargetCourtId,
+                    mode: 'MANUAL',
+                    sessionId: state.activeSession.id,
+                    startTime: Date.now(),
+                    team1: [p0, p1],
+                    team2: [p2, p3],
+                    sets: [{ team1: 0, team2: 0 }]
+                };
+
+                saveState();
+                closeModal('modal-assign-manual');
+                renderAll();
+                showToast(`Cancha #${manualTargetCourtId} asignada manualmente.`, "🎾");
+            };
+
+            /* -------------------------------------------------------------
+               AUTOMATIC PAIRING ALGORITHM
+               ------------------------------------------------------------- */
+            window.autoFillNextCourt = function() {
+                if (!state.activeSession) {
+                    showToast("Debes iniciar una jornada antes de poder asignar canchas.", "⚠️");
+                    openStartSessionModal();
+                    return;
+                }
+
+                const totalCourts = state.activeSession ? state.activeSession.courtCount : state.courtCount;
+                let freeCourt = null;
+                for (let i = 1; i <= totalCourts; i++) {
+                    if (!state.activeMatches[i]) {
+                        freeCourt = i;
+                        break;
+                    }
+                }
+                if (!freeCourt) {
+                    showToast("Todas las canchas están ocupadas actualmente.", "⚠️");
+                    return;
+                }
+                fillCourt(freeCourt);
+            };
+
+            window.fillCourt = function(courtId) {
+                if (!state.activeSession) {
+                    showToast("Debes iniciar una jornada antes de poder asignar canchas.", "⚠️");
+                    openStartSessionModal();
+                    return;
+                }
+
+                let pool = state.players.filter(p => p.status === 'WAITING');
+
+                if (pool.length < 4) {
+                    showToast(`Se necesitan al menos 4 jugadores presentes en espera (hay ${pool.length}). Marca como "Presente" a más jugadores.`, "⚠️");
+                    return;
+                }
+
+                const mode = state.matchGenerationMode;
+                if (mode === 'MASCULINO') pool = pool.filter(p => p.gender === 'M');
+                if (mode === 'FEMENINO') pool = pool.filter(p => p.gender === 'F');
+
+                if (mode === 'MIXTO') {
+                    const males = pool.filter(p => p.gender === 'M');
+                    const females = pool.filter(p => p.gender === 'F');
+                    if (males.length < 2 || females.length < 2) {
+                        showToast("Para partido Mixto se precisan mínimo 2 hombres y 2 mujeres presentes en espera.", "⚠️");
+                        return;
+                    }
+                }
+
+                if (pool.length < 4) {
+                    showToast(`No hay suficientes jugadores para la modalidad ${mode}.`, "⚠️");
+                    return;
+                }
+
+                const sortCandidates = (list) => {
+                    return [...list].sort((a, b) => {
+                        const waitDiff = (b.waitTurns || 0) - (a.waitTurns || 0);
+                        if (waitDiff !== 0) return waitDiff;
+                        const pjDiff = (a.sessionMatchesPlayed || 0) - (b.sessionMatchesPlayed || 0);
+                        if (pjDiff !== 0) return pjDiff;
+                        return 0.5 - Math.random();
+                    });
+                };
+
+                let chosen = [];
+                if (mode === 'MIXTO') {
+                    const malesSorted = sortCandidates(pool.filter(p => p.gender === 'M'));
+                    const femalesSorted = sortCandidates(pool.filter(p => p.gender === 'F'));
+                    chosen = [malesSorted[0], malesSorted[1], femalesSorted[0], femalesSorted[1]];
+                } else {
+                    const sorted = sortCandidates(pool);
+                    chosen = sorted.slice(0, 4);
+                }
+
+                chosen.sort((a, b) => {
+                    return getSkillScore(a.category, a.subcategory) - getSkillScore(b.category, b.subcategory);
+                });
+
+                let team1, team2;
+                if (mode === 'MIXTO') {
+                    const malesIn = chosen.filter(p => p.gender === 'M');
+                    const femalesIn = chosen.filter(p => p.gender === 'F');
+                    team1 = [malesIn[0], femalesIn[1]];
+                    team2 = [malesIn[1], femalesIn[0]];
+                } else {
+                    team1 = [chosen[0], chosen[3]];
+                    team2 = [chosen[1], chosen[2]];
+                }
+
+                chosen.forEach(p => {
+                    p.status = 'PLAYING';
+                    p.waitTurns = 0;
+                });
+
+                state.players.forEach(p => {
+                    if (p.status === 'WAITING' && !chosen.find(c => c.id === p.id)) {
+                        p.waitTurns = (p.waitTurns || 0) + 1;
+                    }
+                });
+
+                state.activeMatches[courtId] = {
+                    courtId,
+                    mode,
+                    sessionId: state.activeSession.id,
+                    startTime: Date.now(),
+                    team1,
+                    team2,
+                    sets: [{ team1: 0, team2: 0 }]
+                };
+
+                saveState();
+                renderAll();
+                showToast(`Cancha #${courtId} armada automáticamente.`, "🎾");
+            };
+
+            /* -------------------------------------------------------------
+               FINISH & COMPUTE MATCH
+               ------------------------------------------------------------- */
+            window.finishCourtMatch = function(courtId) {
+                const match = state.activeMatches[courtId];
+                if (!match) return;
+
+                let setsTeam1 = 0;
+                let setsTeam2 = 0;
+                let totalGamesTeam1 = 0;
+                let totalGamesTeam2 = 0;
+
+                match.sets.forEach(s => {
+                    totalGamesTeam1 += s.team1;
+                    totalGamesTeam2 += s.team2;
+                    if (s.team1 > s.team2) setsTeam1++;
+                    if (s.team2 > s.team1) setsTeam2++;
+                });
+
+                let winner = null;
+                if (setsTeam1 > setsTeam2) winner = 1;
+                else if (setsTeam2 > setsTeam1) winner = 2;
+                else {
+                    if (totalGamesTeam1 > totalGamesTeam2) winner = 1;
+                    else if (totalGamesTeam2 > totalGamesTeam1) winner = 2;
+                }
+
+                if (!winner && totalGamesTeam1 === 0 && totalGamesTeam2 === 0) {
+                    showToast("Ingresa los games jugados antes de finalizar el partido.", "⚠️");
+                    return;
+                }
+
+                if (!winner) winner = 1;
+
+                const team1Players = match.team1.map(p => state.players.find(x => x.id === p.id)).filter(Boolean);
+                const team2Players = match.team2.map(p => state.players.find(x => x.id === p.id)).filter(Boolean);
+
+                const recordStats = (playersList, isWinner, gamesWon, gamesLost) => {
+                    playersList.forEach(p => {
+                        p.totalMatches = (p.totalMatches || 0) + 1;
+                        if (isWinner) p.matchesWon = (p.matchesWon || 0) + 1;
+                        p.gamesWon = (p.gamesWon || 0) + gamesWon;
+                        p.gamesLost = (p.gamesLost || 0) + gamesLost;
+
+                        p.sessionMatchesPlayed = (p.sessionMatchesPlayed || 0) + 1;
+                        if (isWinner) p.sessionMatchesWon = (p.sessionMatchesWon || 0) + 1;
+                        p.sessionGamesWon = (p.sessionGamesWon || 0) + gamesWon;
+                        p.sessionGamesLost = (p.sessionGamesLost || 0) + gamesLost;
+
+                        p.status = 'WAITING';
+                        p.waitTurns = 0;
+                    });
+                };
+
+                recordStats(team1Players, winner === 1, totalGamesTeam1, totalGamesTeam2);
+                recordStats(team2Players, winner === 2, totalGamesTeam2, totalGamesTeam1);
+
+                const scoreStr = match.sets.map(s => `${s.team1}-${s.team2}`).join(', ');
+
+                state.history.push({
+                    id: 'm_' + Date.now(),
+                    sessionId: match.sessionId,
+                    timestamp: Date.now(),
+                    courtId,
+                    team1: match.team1,
+                    team2: match.team2,
+                    scoreText: scoreStr,
+                    winner
+                });
+
+                state.activeMatches[courtId] = null;
+                saveState();
+                renderAll();
+                showToast(`Partido en Cancha #${courtId} finalizado y computado.`, "✅");
+            };
+
+            window.cancelCourtMatch = function(courtId) {
+                openConfirmDialog(
+                    "Anular Partido",
+                    `¿Deseas anular el partido de la Cancha #${courtId}? Los 4 jugadores volverán a la lista de espera sin computar puntos.`,
+                    () => {
+                        const match = state.activeMatches[courtId];
+                        if (match) {
+                            [...match.team1, ...match.team2].forEach(p => {
+                                const real = state.players.find(x => x.id === p.id);
+                                if (real) real.status = 'WAITING';
+                            });
+                            state.activeMatches[courtId] = null;
+                            saveState();
+                            renderAll();
+                            showToast(`Cancha #${courtId} anulada y liberada.`, "ℹ️");
+                        }
+                    }
+                );
+            };
+
+            /* -------------------------------------------------------------
+               LIVE COURT SUBSTITUTION & EDIT MODAL
+               ------------------------------------------------------------- */
+            window.openCourtEditModal = function(courtId) {
+                const match = state.activeMatches[courtId];
+                if (!match) return;
+                editingCourtId = courtId;
+                document.getElementById('edit-court-number').textContent = courtId;
+
+                const eligible = state.players.filter(p => p.status === 'WAITING' || [...match.team1, ...match.team2].some(c => c.id === p.id));
+
+                const populateSelect = (selectId, currentVal) => {
+                    const sel = document.getElementById(selectId);
+                    if (!sel) return;
+                    sel.innerHTML = eligible.map(p => `
+                        <option value="${p.id}" ${p.id === currentVal ? 'selected' : ''}>
+                            ${p.name} (${p.category}ª ${p.subcategory})
+                        </option>
+                    `).join('');
+                };
+
+                populateSelect('select-court-p0', match.team1[0].id);
+                populateSelect('select-court-p1', match.team1[1].id);
+                populateSelect('select-court-p2', match.team2[0].id);
+                populateSelect('select-court-p3', match.team2[1].id);
+
+                openModal('modal-edit-court-match');
+            };
+
+            window.saveCourtSubstitutions = function() {
+                if (!editingCourtId) return;
+                const match = state.activeMatches[editingCourtId];
+                if (!match) return;
+
+                const id0 = document.getElementById('select-court-p0').value;
+                const id1 = document.getElementById('select-court-p1').value;
+                const id2 = document.getElementById('select-court-p2').value;
+                const id3 = document.getElementById('select-court-p3').value;
+
+                const ids = [id0, id1, id2, id3];
+                if (new Set(ids).size !== 4) {
+                    showToast("No puedes seleccionar el mismo jugador dos veces en la cancha.", "⚠️");
+                    return;
+                }
+
+                const oldIds = [...match.team1, ...match.team2].map(p => p.id);
+                oldIds.forEach(oldId => {
+                    if (!ids.includes(oldId)) {
+                        const p = state.players.find(x => x.id === oldId);
+                        if (p) p.status = 'WAITING';
+                    }
+                });
+
+                const p0 = state.players.find(x => x.id === id0);
+                const p1 = state.players.find(x => x.id === id1);
+                const p2 = state.players.find(x => x.id === id2);
+                const p3 = state.players.find(x => x.id === id3);
+
+                [p0, p1, p2, p3].forEach(p => {
+                    if (p) p.status = 'PLAYING';
+                });
+
+                match.team1 = [p0, p1];
+                match.team2 = [p2, p3];
+
+                saveState();
+                closeModal('modal-edit-court-match');
+                renderAll();
+                showToast("Alineación de cancha actualizada correctamente.", "🔄");
+            };
+
+            /* -------------------------------------------------------------
+               PLAYERS CRUD & LIVE SESSION METRICS
+               ------------------------------------------------------------- */
+            window.handleAddPlayer = function(e) {
+                e.preventDefault();
+                const nameInput = document.getElementById('player-name');
+                const name = nameInput.value.trim();
+                const gender = document.getElementById('player-gender').value;
+                const category = parseInt(document.getElementById('player-category').value, 10);
+                const subcategory = document.getElementById('player-subcategory').value;
+
+                if (!name) return;
+
+                // Prevent duplicate player names (case-insensitive)
+                const isDuplicate = state.players.some(p => p.name.trim().toLowerCase() === name.toLowerCase());
+                if (isDuplicate) {
+                    showToast(`Ya existe un jugador registrado con el nombre "${name}". Usa un nombre diferente o agrega su inicial de apellido.`, "⚠️");
+                    return;
+                }
+
+                const newPlayer = {
+                    id: 'p_' + Date.now(),
+                    name,
+                    gender,
+                    category,
+                    subcategory,
+                    status: state.activeSession ? 'WAITING' : 'DISABLED',
+                    waitTurns: 0,
+                    sessionMatchesPlayed: 0,
+                    sessionMatchesWon: 0,
+                    sessionGamesWon: 0,
+                    sessionGamesLost: 0,
+                    totalMatches: 0,
+                    matchesWon: 0,
+                    gamesWon: 0,
+                    gamesLost: 0
+                };
+
+                state.players.push(newPlayer);
+                nameInput.value = '';
+                saveState();
+                renderAll();
+                showToast(`${name} agregado con éxito (${newPlayer.status === 'WAITING' ? 'Presente' : 'Ausente'}).`, "👤");
+            };
+
+            window.handleSortPlayers = function(field) {
+                if (playersSort.field === field) {
+                    playersSort.direction = playersSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    playersSort.field = field;
+                    playersSort.direction = (field === 'name' || field === 'gender' || field === 'status' || field === 'rank') ? 'asc' : 'desc';
+                }
+                renderPlayersTable();
+            };
+
+            window.handleSortRanking = function(field) {
+                if (rankingSort.field === field) {
+                    rankingSort.direction = rankingSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    rankingSort.field = field;
+                    rankingSort.direction = (field === 'name' || field === 'pos') ? 'asc' : 'desc';
+                }
+                renderRankingTable();
+            };
+
+            function updateSortIcons(tableType, activeField, activeDirection, fieldKeys) {
+                fieldKeys.forEach(f => {
+                    const el = document.getElementById(`sort-icon-${tableType}-${f}`);
+                    if (!el) return;
+                    if (f === activeField) {
+                        el.textContent = activeDirection === 'asc' ? '▲' : '▼';
+                        el.className = 'text-lime-400 font-bold ml-0.5';
+                    } else {
+                        el.textContent = '';
+                    }
+                });
+            }
+
+            window.togglePlayerPresence = function(playerId) {
+                const p = state.players.find(x => x.id === playerId);
+                if (!p) return;
+
+                if (p.status === 'PLAYING') {
+                    showToast("El jugador está disputando un partido en cancha actualmente.", "⚠️");
+                    return;
+                }
+
+                if (p.status === 'DISABLED') {
+                    p.status = 'WAITING'; // Presente
+                    p.waitTurns = 0;
+                    showToast(`${p.name} marcado como PRESENTE.`, "🟢");
+                } else {
+                    p.status = 'DISABLED'; // Ausente
+                    p.waitTurns = 0;
+                    showToast(`${p.name} marcado como AUSENTE.`, "🔴");
+                }
+
+                saveState();
+                renderAll();
+            };
+
+            function renderPlayersTable() {
+                const tbody = document.getElementById('players-table-body');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                const filterPresence = document.getElementById('filter-player-presence')?.value || 'ALL';
+                const searchTxt = (document.getElementById('player-search-input')?.value || '').toLowerCase().trim();
+                const rankingCriterion = document.getElementById('session-ranking-criterion')?.value || 'PG';
+
+                // Compute base session statistics for all players first to determine official session ranking
+                let baseList = state.players.map(p => {
+                    const pj = p.sessionMatchesPlayed || 0;
+                    const pg = p.sessionMatchesWon || 0;
+                    const pp = pj - pg;
+                    const diffGames = (p.sessionGamesWon || 0) - (p.sessionGamesLost || 0);
+                    const winRate = pj > 0 ? Math.round((pg / pj) * 100) : 0;
+                    const ptsHoy = pg * 3 + pp * 1;
+                    return {
+                        ...p,
+                        pj,
+                        pg,
+                        pp,
+                        winRate,
+                        diffGames,
+                        ptsHoy
+                    };
+                });
+
+                // Assign canonical session rank according to the chosen criterion
+                baseList.sort((a, b) => {
+                    if (rankingCriterion === 'PG') {
+                        // Más victorias (PG), desempate por % de victorias, luego Dif Games, luego Pts
+                        if (b.pg !== a.pg) return b.pg - a.pg;
+                        if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                        if (b.diffGames !== a.diffGames) return b.diffGames - a.diffGames;
+                        return b.ptsHoy - a.ptsHoy;
+                    } else {
+                        // % de victorias, desempate por cantidad de victorias (PG), luego Dif Games, luego Pts
+                        if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                        if (b.pg !== a.pg) return b.pg - a.pg;
+                        if (b.diffGames !== a.diffGames) return b.diffGames - a.diffGames;
+                        return b.ptsHoy - a.ptsHoy;
+                    }
+                });
+
+                baseList.forEach((p, i) => {
+                    p.sessionRank = i + 1;
+                });
+
+                let list = baseList;
+
+                if (filterPresence === 'PRESENT') {
+                    list = list.filter(p => p.status !== 'DISABLED');
+                } else if (filterPresence === 'DISABLED') {
+                    list = list.filter(p => p.status === 'DISABLED');
+                }
+
+                if (searchTxt) {
+                    list = list.filter(p => 
+                        p.name.toLowerCase().includes(searchTxt) || 
+                        `${p.category}`.includes(searchTxt) || 
+                        p.subcategory.toLowerCase().includes(searchTxt)
+                    );
+                }
+
+                // Apply interactive column sort
+                const { field, direction } = playersSort;
+                list.sort((a, b) => {
+                    let valA, valB;
+                    switch (field) {
+                        case 'rank':
+                            valA = a.sessionRank;
+                            valB = b.sessionRank;
+                            break;
+                        case 'name':
+                            valA = a.name.toLowerCase();
+                            valB = b.name.toLowerCase();
+                            break;
+                        case 'gender':
+                            valA = a.gender;
+                            valB = b.gender;
+                            break;
+                        case 'category':
+                            valA = getSkillScore(a.category, a.subcategory);
+                            valB = getSkillScore(b.category, b.subcategory);
+                            break;
+                        case 'status':
+                            valA = a.status;
+                            valB = b.status;
+                            break;
+                        case 'pj':
+                            valA = a.pj;
+                            valB = b.pj;
+                            break;
+                        case 'pg':
+                            valA = a.pg;
+                            valB = b.pg;
+                            break;
+                        case 'pp':
+                            valA = a.pp;
+                            valB = b.pp;
+                            break;
+                        case 'winRate':
+                            valA = a.winRate;
+                            valB = b.winRate;
+                            break;
+                        case 'diffGames':
+                            valA = a.diffGames;
+                            valB = b.diffGames;
+                            break;
+                        case 'ptsHoy':
+                            valA = a.ptsHoy;
+                            valB = b.ptsHoy;
+                            break;
+                        case 'waitTurns':
+                            valA = a.waitTurns || 0;
+                            valB = b.waitTurns || 0;
+                            break;
+                        default:
+                            valA = a.sessionRank;
+                            valB = b.sessionRank;
+                    }
+
+                    if (valA < valB) return direction === 'asc' ? -1 : 1;
+                    if (valA > valB) return direction === 'asc' ? 1 : -1;
+                    return a.sessionRank - b.sessionRank;
+                });
+
+                updateSortIcons('players', field, direction, ['rank', 'name', 'gender', 'category', 'status', 'pj', 'pg', 'pp', 'winRate', 'diffGames', 'ptsHoy', 'waitTurns']);
+
+                if (list.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="13" class="text-center py-10 text-slate-500">
+                                No se encontraron jugadores en esta vista o búsqueda.
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                list.forEach((p) => {
+                    const sessionRank = p.sessionRank;
+                    let rankBadge = '';
+                    if (sessionRank === 1 && p.pj > 0) {
+                        rankBadge = `<span class="w-6 h-6 rounded-lg bg-amber-400 text-slate-950 font-black flex items-center justify-center text-xs mx-auto shadow-sm">1º</span>`;
+                    } else if (sessionRank === 2 && p.pj > 0) {
+                        rankBadge = `<span class="w-6 h-6 rounded-lg bg-slate-300 text-slate-950 font-black flex items-center justify-center text-xs mx-auto shadow-sm">2º</span>`;
+                    } else if (sessionRank === 3 && p.pj > 0) {
+                        rankBadge = `<span class="w-6 h-6 rounded-lg bg-amber-700 text-white font-black flex items-center justify-center text-xs mx-auto shadow-sm">3º</span>`;
+                    } else {
+                        rankBadge = `<span class="font-bold text-slate-400 text-xs">#${sessionRank}</span>`;
+                    }
+
+                    let attendanceHtml = '';
+                    if (p.status === 'PLAYING') {
+                        attendanceHtml = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">En Cancha</span>`;
+                    } else if (p.status === 'WAITING') {
+                        attendanceHtml = `
+                            <button onclick="togglePlayerPresence('${p.id}')" class="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 transition flex items-center gap-1 mx-auto" title="Click para marcar Ausente">
+                                <span>🟢</span> Presente
+                            </button>
+                        `;
+                    } else if (p.status === 'RESTING') {
+                        attendanceHtml = `
+                            <button onclick="togglePlayerPresence('${p.id}')" class="px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 transition flex items-center gap-1 mx-auto">
+                                <span>⏸️</span> Descanso
+                            </button>
+                        `;
+                    } else {
+                        attendanceHtml = `
+                            <button onclick="togglePlayerPresence('${p.id}')" class="px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 transition flex items-center gap-1 mx-auto" title="Click para marcar Presente">
+                                <span>🔴</span> Ausente
+                            </button>
+                        `;
+                    }
+
+                    const genderBadge = p.gender === 'M' 
+                        ? `<span class="text-blue-400 font-bold">H</span>` 
+                        : `<span class="text-pink-400 font-bold">M</span>`;
+
+                    const subBadge = p.subcategory === 'AVANZADO' ? 'Avan.' : p.subcategory === 'INTERMEDIO' ? 'Inter.' : 'Inic.';
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="p-3 pl-5 text-center">${rankBadge}</td>
+                            <td class="p-3 font-bold text-white flex items-center gap-2">
+                                <span>${p.name}</span>
+                            </td>
+                            <td class="p-3 text-center">${genderBadge}</td>
+                            <td class="p-3 text-center">
+                                <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-bold text-[10px] border border-slate-700">
+                                    ${p.category}ª ${subBadge}
+                                </span>
+                            </td>
+                            <td class="p-3 text-center">${attendanceHtml}</td>
+                            <td class="p-3 text-center font-black text-lime-400 bg-slate-900/60">${p.pj}</td>
+                            <td class="p-3 text-center text-emerald-400 font-black text-sm">${p.pg}</td>
+                            <td class="p-3 text-center text-rose-400 font-bold">${p.pp}</td>
+                            <td class="p-3 text-center font-black text-lime-400 text-sm">${p.winRate}%</td>
+                            <td class="p-3 text-center font-mono ${p.diffGames > 0 ? 'text-emerald-400 font-bold' : p.diffGames < 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}">
+                                ${p.diffGames > 0 ? '+' : ''}${p.diffGames}
+                            </td>
+                            <td class="p-3 text-center font-black text-amber-400 text-sm">${p.ptsHoy}</td>
+                            <td class="p-3 text-center">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${p.waitTurns > 0 ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30' : 'text-slate-500'}">
+                                    ${p.waitTurns || 0}
+                                </span>
+                            </td>
+                            <td class="p-3 pr-5 text-right space-x-1">
+                                <button onclick="openEditPlayerModal('${p.id}')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]" title="Editar Jugador">
+                                    ✏️
+                                </button>
+                                <button onclick="confirmDeletePlayer('${p.id}')" class="px-2 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 text-[11px] border border-rose-900/30" title="Eliminar Jugador">
+                                    🗑️
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                const totEl = document.getElementById('metric-total-players');
+                const onCEl = document.getElementById('metric-oncourt-players');
+                const waiEl = document.getElementById('metric-waiting-players');
+                const inaEl = document.getElementById('metric-inactive-players');
+
+                if (totEl) totEl.textContent = state.players.length;
+                if (onCEl) onCEl.textContent = state.players.filter(p => p.status === 'PLAYING').length;
+                if (waiEl) waiEl.textContent = state.players.filter(p => p.status === 'WAITING').length;
+                if (inaEl) inaEl.textContent = state.players.filter(p => p.status === 'DISABLED').length;
+
+                const pjs = state.players.filter(p => p.status !== 'DISABLED').map(p => p.sessionMatchesPlayed || 0);
+                const tag = document.getElementById('metric-equity-tag');
+                if (tag) {
+                    if (pjs.length <= 1) {
+                        tag.textContent = "Sin datos suficientes";
+                        tag.className = "px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400";
+                    } else {
+                        const max = Math.max(...pjs);
+                        const min = Math.min(...pjs);
+                        const diff = max - min;
+                        if (diff <= 1) {
+                            tag.textContent = `Excelente (Diferencia máx: ${diff})`;
+                            tag.className = "px-2.5 py-1 rounded-full text-[10px] font-bold bg-lime-500/10 text-lime-400 border border-lime-500/30";
+                        } else {
+                            tag.textContent = `Ajustando cola (Diferencia máx: ${diff})`;
+                            tag.className = "px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30";
+                        }
+                    }
+                }
+            }
+
+            window.openEditPlayerModal = function(playerId) {
+                const p = state.players.find(x => x.id === playerId);
+                if (!p) return;
+
+                document.getElementById('edit-player-id').value = p.id;
+                document.getElementById('edit-player-name').value = p.name;
+                document.getElementById('edit-player-gender').value = p.gender;
+                document.getElementById('edit-player-category').value = p.category;
+                document.getElementById('edit-player-subcategory').value = p.subcategory;
+                document.getElementById('edit-player-presence').value = p.status === 'PLAYING' ? 'WAITING' : p.status;
+
+                openModal('modal-edit-player');
+            };
+
+            window.handleSavePlayerEdit = function(e) {
+                e.preventDefault();
+                const id = document.getElementById('edit-player-id').value;
+                const p = state.players.find(x => x.id === id);
+                if (!p) return;
+
+                const newName = document.getElementById('edit-player-name').value.trim();
+
+                // Prevent renaming to an existing name of another player
+                const isDuplicate = state.players.some(other => other.id !== id && other.name.trim().toLowerCase() === newName.toLowerCase());
+                if (isDuplicate) {
+                    showToast(`Ya existe otro jugador con el nombre "${newName}". Por favor elige otro.`, "⚠️");
+                    return;
+                }
+
+                p.name = newName;
+                p.gender = document.getElementById('edit-player-gender').value;
+                p.category = parseInt(document.getElementById('edit-player-category').value, 10);
+                p.subcategory = document.getElementById('edit-player-subcategory').value;
+
+                const presence = document.getElementById('edit-player-presence').value;
+                if (p.status !== 'PLAYING') {
+                    p.status = presence;
+                }
+
+                saveState();
+                closeModal('modal-edit-player');
+                renderAll();
+                showToast("Datos de jugador actualizados.", "✅");
+            };
+
+            window.requestDeletePlayerFromModal = function() {
+                const id = document.getElementById('edit-player-id').value;
+                closeModal('modal-edit-player');
+                confirmDeletePlayer(id);
+            };
+
+            window.confirmDeletePlayer = function(playerId) {
+                const p = state.players.find(x => x.id === playerId);
+                if (!p) return;
+
+                openConfirmDialog(
+                    "Eliminar Jugador",
+                    `¿Seguro que deseas eliminar a "${p.name}"? Si está en una cancha activa, la cancha se liberará.`,
+                    () => {
+                        for (let c in state.activeMatches) {
+                            const m = state.activeMatches[c];
+                            if (m && [...m.team1, ...m.team2].some(x => x.id === playerId)) {
+                                state.activeMatches[c] = null;
+                            }
+                        }
+                        state.players = state.players.filter(x => x.id !== playerId);
+                        saveState();
+                        renderAll();
+                        showToast(`Jugador ${p.name} eliminado.`, "🗑️");
+                    }
+                );
+            };
+
+            /* -------------------------------------------------------------
+               MONTHLY & HISTORICAL RANKING (WITH ADVANCED FILTERS)
+               ------------------------------------------------------------- */
+            function populateSessionFilterOptions() {
+                const sel = document.getElementById('ranking-session-filter');
+                if (!sel) return;
+                const curVal = sel.value;
+
+                let opts = `<option value="ALL">Todas las Jornadas</option>`;
+                if (state.activeSession) {
+                    opts += `<option value="${state.activeSession.id}">[ACTUAL] ${state.activeSession.name}</option>`;
+                }
+                state.pastSessions.forEach(s => {
+                    const dStr = new Date(s.startTime).toLocaleDateString([], { day: '2-digit', month: 'short' });
+                    opts += `<option value="${s.id}">${s.name} (${dStr})</option>`;
+                });
+                sel.innerHTML = opts;
+                if ([...sel.options].some(o => o.value === curVal)) {
+                    sel.value = curVal;
+                }
+            }
+
+            function getRankingData() {
+                const monthScope = document.getElementById('ranking-month-select')?.value || 'CURRENT_MONTH';
+                const sessionFilter = document.getElementById('ranking-session-filter')?.value || 'ALL';
+                const catFilter = document.getElementById('ranking-category-filter')?.value || 'ALL';
+                const genderFilter = document.getElementById('ranking-gender-filter')?.value || 'ALL';
+                const baseCriterion = document.getElementById('ranking-base-criterion')?.value || 'PG';
+
+                const now = new Date();
+                const curYear = now.getFullYear();
+                const curMonth = now.getMonth();
+
+                let data = state.players
+                    .filter(p => {
+                        if (genderFilter !== 'ALL' && p.gender !== genderFilter) return false;
+                        if (catFilter !== 'ALL' && `${p.category}` !== catFilter) return false;
+                        return true;
+                    })
+                    .map(p => {
+                        const playerMatches = state.history.filter(m => {
+                            const inMatch = [...m.team1, ...m.team2].some(x => x.id === p.id);
+                            if (!inMatch) return false;
+
+                            if (sessionFilter !== 'ALL' && m.sessionId !== sessionFilter) return false;
+
+                            if (monthScope === 'CURRENT_MONTH') {
+                                const d = new Date(m.timestamp);
+                                return d.getFullYear() === curYear && d.getMonth() === curMonth;
+                            }
+                            return true;
+                        });
+
+                        let pj = playerMatches.length;
+                        let pg = 0;
+                        let gamesWon = 0;
+                        let gamesLost = 0;
+
+                        playerMatches.forEach(m => {
+                            const isTeam1 = m.team1.some(x => x.id === p.id);
+                            const won = (m.winner === 1 && isTeam1) || (m.winner === 2 && !isTeam1);
+                            if (won) pg++;
+
+                            const sets = m.scoreText.split(',').map(s => s.trim().split('-'));
+                            sets.forEach(set => {
+                                const g1 = parseInt(set[0], 10) || 0;
+                                const g2 = parseInt(set[1], 10) || 0;
+                                if (isTeam1) {
+                                    gamesWon += g1;
+                                    gamesLost += g2;
+                                } else {
+                                    gamesWon += g2;
+                                    gamesLost += g1;
+                                }
+                            });
+                        });
+
+                        const pp = pj - pg;
+                        const points = pg * 3 + pp * 1;
+                        const diffGames = gamesWon - gamesLost;
+                        const winRate = pj > 0 ? Math.round((pg / pj) * 100) : 0;
+
+                        return {
+                            ...p,
+                            pj,
+                            pg,
+                            pp,
+                            gamesWon,
+                            gamesLost,
+                            diffGames,
+                            winRate,
+                            points
+                        };
+                    });
+
+                // Default sorting based on the selected ranking criterion
+                data.sort((a, b) => {
+                    if (baseCriterion === 'PG') {
+                        // Más victorias, desempate por % de victorias, luego Puntos, luego Dif Games
+                        if (b.pg !== a.pg) return b.pg - a.pg;
+                        if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                        if (b.points !== a.points) return b.points - a.points;
+                        return b.diffGames - a.diffGames;
+                    } else if (baseCriterion === 'WINRATE') {
+                        // % de victorias, desempate por cantidad de victorias (PG), luego Puntos, luego Dif Games
+                        if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                        if (b.pg !== a.pg) return b.pg - a.pg;
+                        if (b.points !== a.points) return b.points - a.points;
+                        return b.diffGames - a.diffGames;
+                    } else {
+                        // Partidos Jugados (PJ)
+                        if (b.pj !== a.pj) return b.pj - a.pj;
+                        if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                        if (b.points !== a.points) return b.points - a.points;
+                        return b.diffGames - a.diffGames;
+                    }
+                });
+
+                // Interactive column sorting if user clicked any column header
+                const { field, direction } = rankingSort;
+                if (field !== 'default') {
+                    data.sort((a, b) => {
+                        let valA, valB;
+                        switch (field) {
+                            case 'name':
+                                valA = a.name.toLowerCase();
+                                valB = b.name.toLowerCase();
+                                break;
+                            case 'category':
+                                valA = getSkillScore(a.category, a.subcategory);
+                                valB = getSkillScore(b.category, b.subcategory);
+                                break;
+                            case 'pj':
+                                valA = a.pj;
+                                valB = b.pj;
+                                break;
+                            case 'pg':
+                                valA = a.pg;
+                                valB = b.pg;
+                                break;
+                            case 'pp':
+                                valA = a.pp;
+                                valB = b.pp;
+                                break;
+                            case 'winRate':
+                                valA = a.winRate;
+                                valB = b.winRate;
+                                break;
+                            case 'games':
+                                valA = a.gamesWon;
+                                valB = b.gamesWon;
+                                break;
+                            case 'diffGames':
+                                valA = a.diffGames;
+                                valB = b.diffGames;
+                                break;
+                            case 'points':
+                                valA = a.points;
+                                valB = b.points;
+                                break;
+                            default:
+                                valA = 0;
+                                valB = 0;
+                        }
+                        if (valA < valB) return direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+
+                return data;
+            }
+
+            function renderRankingTable() {
+                const tbody = document.getElementById('ranking-table-body');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                const ranked = getRankingData();
+                updateSortIcons('ranking', rankingSort.field, rankingSort.direction, ['name', 'category', 'pj', 'pg', 'pp', 'winRate', 'games', 'diffGames', 'points']);
+
+                if (ranked.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="10" class="text-center py-10 text-slate-500">
+                                Sin partidos disputados para los filtros seleccionados.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                // Posición estática correlativa (1 a N) reflejando el orden actual
+                ranked.forEach((r, idx) => {
+                    const pos = idx + 1;
+                    let posBadge = '';
+                    if (pos === 1 && r.pj > 0) {
+                        posBadge = `<span class="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 font-black flex items-center justify-center text-sm shadow-lg shadow-amber-400/20 mx-auto">1º</span>`;
+                    } else if (pos === 2 && r.pj > 0) {
+                        posBadge = `<span class="w-8 h-8 rounded-xl bg-slate-300 text-slate-950 font-black flex items-center justify-center text-sm shadow-md mx-auto">2º</span>`;
+                    } else if (pos === 3 && r.pj > 0) {
+                        posBadge = `<span class="w-8 h-8 rounded-xl bg-amber-700 text-white font-black flex items-center justify-center text-sm shadow-md mx-auto">3º</span>`;
+                    } else {
+                        posBadge = `<span class="font-bold text-slate-400 text-sm">#${pos}</span>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-800/30 transition border-b border-slate-800/40">
+                            <td class="p-4 pl-5 text-center font-bold">${posBadge}</td>
+                            <td class="p-4 font-bold text-white">
+                                <div class="flex items-center gap-2">
+                                    <span>${r.name}</span>
+                                    <span class="text-[10px] font-bold ${r.gender === 'M' ? 'text-blue-400' : 'text-pink-400'}">(${r.gender})</span>
+                                </div>
+                            </td>
+                            <td class="p-4 text-center">
+                                <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-bold text-[10px] border border-slate-700">
+                                    ${r.category}ª ${r.subcategory.substring(0, 4)}.
+                                </span>
+                            </td>
+                            <td class="p-4 text-center font-black text-white bg-slate-900/60 text-sm">${r.pj}</td>
+                            <td class="p-4 text-center font-bold text-emerald-400">${r.pg}</td>
+                            <td class="p-4 text-center font-bold text-rose-400">${r.pp}</td>
+                            <td class="p-4 text-center font-black text-lime-400 text-sm">${r.winRate}%</td>
+                            <td class="p-4 text-center text-slate-400 font-mono">${r.gamesWon}/${r.gamesLost}</td>
+                            <td class="p-4 text-center font-mono ${r.diffGames > 0 ? 'text-emerald-400 font-bold' : r.diffGames < 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}">
+                                ${r.diffGames > 0 ? '+' : ''}${r.diffGames}
+                            </td>
+                            <td class="p-4 pr-5 text-right font-black text-amber-400 text-base">
+                                ${r.points} <span class="text-[10px] text-slate-400 font-normal">pts</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            /* -------------------------------------------------------------
+               ARCHIVED SESSIONS & VIEW TABLE / WHATSAPP SHARE
+               ------------------------------------------------------------- */
+            function renderPastSessions() {
+                const container = document.getElementById('past-sessions-list');
+                if (!container) return;
+                container.innerHTML = '';
+
+                if (state.pastSessions.length === 0) {
+                    container.innerHTML = `
+                        <div class="bg-slate-900 rounded-2xl p-10 border border-slate-800 text-center text-slate-400 text-xs space-y-2">
+                            <span class="text-3xl block opacity-40">📜</span>
+                            <p>No hay jornadas finalizadas archivadas todavía.</p>
+                            <p class="text-slate-500">Al cerrar una jornada activa con el botón "Finalizar Jornada", quedará guardada aquí con su fecha y resultados de los jugadores presentes.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                state.pastSessions.forEach((sess) => {
+                    const startD = new Date(sess.startTime);
+                    const dateStr = startD.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    const timeStr = startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    let top3Html = '';
+                    if (sess.participants && sess.participants.length > 0) {
+                        const top = [...sess.participants].sort((a, b) => b.pg - a.pg || b.winRate - a.winRate || b.points - a.points).slice(0, 3);
+                        top3Html = `
+                            <div class="flex items-center gap-2 mt-2 flex-wrap text-[11px]">
+                                <span class="text-slate-400 font-semibold">Podio:</span>
+                                ${top.map((tp, pIdx) => `
+                                    <span class="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-300">
+                                        ${pIdx === 0 ? '🥇' : pIdx === 1 ? '🥈' : '🥉'} <b>${tp.name}</b> (${tp.pg} PG - ${tp.winRate || 0}%)
+                                    </span>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+
+                    container.innerHTML += `
+                        <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-base font-black text-white">${sess.name}</span>
+                                    <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">Archivada</span>
+                                </div>
+                                <div class="text-xs text-slate-400 flex items-center gap-3">
+                                    <span>📍 ${sess.location}</span>
+                                    <span>•</span>
+                                    <span>📅 ${dateStr} - ${timeStr}</span>
+                                    <span>•</span>
+                                    <span>🎾 ${sess.totalMatches || 0} partidos</span>
+                                    <span>•</span>
+                                    <span>👥 ${sess.participants ? sess.participants.length : 0} presentes</span>
+                                </div>
+                                ${top3Html}
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button onclick="viewPastSessionDetails('${sess.id}')" class="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center gap-1.5 transition">
+                                    <span>👁️</span> Ver Tabla
+                                </button>
+                                <button onclick="sharePastSessionWhatsApp('${sess.id}')" class="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm flex items-center gap-1.5 transition">
+                                    <span>📲</span> WhatsApp
+                                </button>
+                                <button onclick="deletePastSession('${sess.id}')" class="px-3 py-2 rounded-xl text-xs font-bold text-rose-400 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/30 flex items-center gap-1.5 transition">
+                                    <span>🗑️</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            window.viewPastSessionDetails = function(sessionId) {
+                const sess = state.pastSessions.find(s => s.id === sessionId);
+                if (!sess) return;
+
+                const titleEl = document.getElementById('view-past-session-title');
+                const metaEl = document.getElementById('view-past-session-meta');
+                const tbody = document.getElementById('view-past-session-tbody');
+                const shareBtn = document.getElementById('view-past-session-share-btn');
+
+                if (titleEl) titleEl.innerHTML = `<span>📜</span> ${sess.name}`;
+                if (metaEl) {
+                    const dateStr = new Date(sess.startTime).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+                    metaEl.textContent = `📍 ${sess.location} • 📅 ${dateStr} • 🎾 ${sess.totalMatches || 0} partidos disputados • 👥 ${sess.participants?.length || 0} presentes`;
+                }
+
+                if (shareBtn) {
+                    shareBtn.onclick = () => {
+                        closeModal('modal-view-past-session');
+                        sharePastSessionWhatsApp(sessionId);
+                    };
+                }
+
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    const participants = sess.participants || [];
+                    const sorted = [...participants].sort((a, b) => b.pg - a.pg || (b.winRate || 0) - (a.winRate || 0) || b.points - a.points || b.diffGames - a.diffGames);
+
+                    if (sorted.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500">Sin participantes registrados en esta jornada.</td></tr>`;
+                    } else {
+                        sorted.forEach((p, idx) => {
+                            const pos = idx + 1;
+                            const posBadge = pos === 1 ? '🥇 1º' : pos === 2 ? '🥈 2º' : pos === 3 ? '🥉 3º' : `#${pos}`;
+                            tbody.innerHTML += `
+                                <tr class="hover:bg-slate-800/40 transition">
+                                    <td class="p-3 text-center font-bold text-slate-300">${posBadge}</td>
+                                    <td class="p-3 font-bold text-white">${p.name}</td>
+                                    <td class="p-3 text-center text-slate-300">${p.category}ª ${p.subcategory ? p.subcategory.substring(0,4) : ''}.</td>
+                                    <td class="p-3 text-center font-black text-lime-400">${p.pj || 0}</td>
+                                    <td class="p-3 text-center font-bold text-emerald-400">${p.pg || 0}</td>
+                                    <td class="p-3 text-center text-rose-400">${p.pp || 0}</td>
+                                    <td class="p-3 text-center font-black text-lime-400">${p.winRate || 0}%</td>
+                                    <td class="p-3 text-center font-mono ${p.diffGames > 0 ? 'text-emerald-400' : p.diffGames < 0 ? 'text-rose-400' : 'text-slate-400'}">
+                                        ${p.diffGames > 0 ? '+' : ''}${p.diffGames || 0}
+                                    </td>
+                                    <td class="p-3 pr-4 text-right font-black text-amber-400 text-sm">${p.points || 0} pts</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                }
+
+                openModal('modal-view-past-session');
+            };
+
+            window.deletePastSession = function(sessionId) {
+                openConfirmDialog(
+                    "Eliminar Jornada del Historial",
+                    "¿Deseas eliminar permanentemente esta jornada histórica? También se desvincularán los partidos asociados a dicha fecha en el ranking.",
+                    () => {
+                        state.pastSessions = state.pastSessions.filter(s => s.id !== sessionId);
+                        state.history = state.history.filter(m => m.sessionId !== sessionId);
+                        saveState();
+                        renderAll();
+                        showToast("Jornada histórica eliminada con éxito.", "🗑️");
+                    }
+                );
+            };
+
+            /* -------------------------------------------------------------
+               WHATSAPP SHARING MODAL & REPORT BUILDER
+               ------------------------------------------------------------- */
+            window.openShareModal = function() {
+                currentShareMode = 'TOP_BAR';
+                selectedPastSessionId = null;
+
+                const titleScope = document.getElementById('share-modal-title-scope');
+                const optionsContainer = document.getElementById('share-options-container');
+
+                if (titleScope) titleScope.textContent = "Selecciona el reporte oficial a compartir:";
+
+                if (optionsContainer) {
+                    optionsContainer.innerHTML = `
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-lime-500/50">
+                            <input type="radio" name="share-scope" value="LAST_SESSION_TOP5" checked onchange="updateSharePreview()" class="text-lime-500">
+                            <span>🔥 <b>Top 5 Última Sesión</b></span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-lime-500/50">
+                            <input type="radio" name="share-scope" value="LAST_SESSION_ALL" onchange="updateSharePreview()" class="text-lime-500">
+                            <span>📋 <b>Toda la Última Sesión</b></span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-lime-500/50">
+                            <input type="radio" name="share-scope" value="MONTH_TOP5" onchange="updateSharePreview()" class="text-lime-500">
+                            <span>👑 <b>Top 5 Mensual</b></span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-lime-500/50">
+                            <input type="radio" name="share-scope" value="MONTH_ALL" onchange="updateSharePreview()" class="text-lime-500">
+                            <span>📊 <b>Ranking Mensual Completo</b></span>
+                        </label>
+                    `;
+                }
+
+                updateSharePreview();
+                openModal('modal-share-report');
+            };
+
+            window.sharePastSessionWhatsApp = function(sessionId) {
+                currentShareMode = 'PAST_SESSION';
+                selectedPastSessionId = sessionId;
+
+                const sess = state.pastSessions.find(s => s.id === sessionId);
+                if (!sess) return;
+
+                const titleScope = document.getElementById('share-modal-title-scope');
+                const optionsContainer = document.getElementById('share-options-container');
+
+                if (titleScope) titleScope.textContent = `Compartir jornada "${sess.name}":`;
+
+                if (optionsContainer) {
+                    optionsContainer.innerHTML = `
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-lime-500/50">
+                            <input type="radio" name="share-scope" value="PAST_SESSION_TOP5" checked onchange="updateSharePreview()" class="text-lime-500">
+                            <span>🔥 <b>Top 5 de esta Jornada</b></span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-lime-500/50">
+                            <input type="radio" name="share-scope" value="PAST_SESSION_ALL" onchange="updateSharePreview()" class="text-lime-500">
+                            <span>📋 <b>Resultados Completos</b></span>
+                        </label>
+                    `;
+                }
+
+                updateSharePreview();
+                openModal('modal-share-report');
+            };
+
+            window.updateSharePreview = function() {
+                const radios = document.getElementsByName('share-scope');
+                let scope = 'LAST_SESSION_TOP5';
+                for (let r of radios) {
+                    if (r.checked) scope = r.value;
+                }
+
+                const criterionRadios = document.getElementsByName('share-ranking-criterion');
+                let criterion = 'PG';
+                for (let cr of criterionRadios) {
+                    if (cr.checked) criterion = cr.value;
+                }
+
+                const criterionLabel = criterion === 'PG' 
+                    ? 'Victorias (PG) con desempate por % Vic' 
+                    : '% de Victorias con desempate por PG';
+
+                let text = `🎾 *PÁDEL OPEN MASTER - REPORTE OFICIAL*\n`;
+                text += `📊 _Criterio de Ranking: ${criterionLabel}_\n\n`;
+
+                const sortListByCriterion = (list) => {
+                    return [...list].sort((a, b) => {
+                        if (criterion === 'PG') {
+                            if (b.pg !== a.pg) return b.pg - a.pg;
+                            if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                            if (b.pts !== a.pts) return b.pts - a.pts;
+                            return b.diff - a.diff;
+                        } else {
+                            if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                            if (b.pg !== a.pg) return b.pg - a.pg;
+                            if (b.pts !== a.pts) return b.pts - a.pts;
+                            return b.diff - a.diff;
+                        }
+                    });
+                };
+
+                if (currentShareMode === 'PAST_SESSION') {
+                    const sess = state.pastSessions.find(s => s.id === selectedPastSessionId);
+                    if (sess) {
+                        const dateStr = new Date(sess.startTime).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+                        text += `🏆 *Jornada:* ${sess.name}\n`;
+                        text += `📍 *Club:* ${sess.location}\n`;
+                        text += `📅 *Fecha:* ${dateStr}\n`;
+                        text += `🎾 *Partidos disputados:* ${sess.totalMatches || 0}\n\n`;
+
+                        const participants = (sess.participants || []).map(p => ({
+                            name: p.name,
+                            category: p.category,
+                            pj: p.pj || 0,
+                            pg: p.pg || 0,
+                            winRate: p.winRate || (p.pj ? Math.round((p.pg / p.pj) * 100) : 0),
+                            pts: p.points || 0,
+                            diff: p.diffGames || 0
+                        }));
+
+                        const sorted = sortListByCriterion(participants);
+
+                        if (scope === 'PAST_SESSION_TOP5') {
+                            text += `🔥 *TOP 5 DE LA JORNADA:*\n`;
+                            const top5 = sorted.slice(0, 5);
+                            if (top5.length === 0) {
+                                text += `_Sin registro de jugadores._\n`;
+                            } else {
+                                top5.forEach((p, idx) => {
+                                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🔹';
+                                    text += `${medal} #${idx + 1} *${p.name}* (${p.category}ª) ➔ *${p.pg} PG* | % Vic: *${p.winRate}%* | ${p.pts} pts (PJ: ${p.pj})\n`;
+                                });
+                            }
+                        } else {
+                            text += `📋 *TABLA COMPLETA DE POSICIONES:*\n`;
+                            if (sorted.length === 0) {
+                                text += `_Sin registro de jugadores._\n`;
+                            } else {
+                                sorted.forEach((p, idx) => {
+                                    text += `#${idx + 1} *${p.name}* (${p.category}ª) ➔ ${p.pg} PG | % Vic: ${p.winRate}% | ${p.pts} pts | PJ: ${p.pj} | Dif: ${p.diff > 0 ? '+' : ''}${p.diff}\n`;
+                                });
+                            }
+                        }
+                    }
+                } else {
+                    // Top Bar mode: Last session or active session
+                    const targetSession = state.activeSession || (state.pastSessions.length > 0 ? state.pastSessions[0] : null);
+
+                    if (targetSession) {
+                        text += `🏆 *Jornada:* ${targetSession.name}\n`;
+                        text += `📍 *Club:* ${targetSession.location}\n`;
+                        text += `📅 *Fecha:* ${new Date(targetSession.startTime).toLocaleDateString([], { day: '2-digit', month: 'short' })}\n`;
+                    }
+
+                    if (scope === 'LAST_SESSION_TOP5') {
+                        text += `\n🔥 *TOP 5 DE LA ÚLTIMA JORNADA:*\n`;
+                        let list = [];
+                        if (state.activeSession) {
+                            list = state.players
+                                .filter(p => p.status !== 'DISABLED' || (p.sessionMatchesPlayed || 0) > 0)
+                                .map(p => {
+                                    const pj = p.sessionMatchesPlayed || 0;
+                                    const pg = p.sessionMatchesWon || 0;
+                                    return {
+                                        name: p.name,
+                                        category: p.category,
+                                        pj,
+                                        pg,
+                                        winRate: pj > 0 ? Math.round((pg / pj) * 100) : 0,
+                                        pts: pg * 3 + (pj - pg) * 1,
+                                        diff: (p.sessionGamesWon || 0) - (p.sessionGamesLost || 0)
+                                    };
+                                });
+                        } else if (state.pastSessions.length > 0 && state.pastSessions[0].participants) {
+                            list = state.pastSessions[0].participants.map(p => ({
+                                name: p.name,
+                                category: p.category,
+                                pj: p.pj || 0,
+                                pg: p.pg || 0,
+                                winRate: p.winRate || (p.pj ? Math.round((p.pg / p.pj) * 100) : 0),
+                                pts: p.points || 0,
+                                diff: p.diffGames || 0
+                            }));
+                        }
+
+                        const sorted = sortListByCriterion(list);
+                        const top5 = sorted.slice(0, 5);
+
+                        if (top5.length === 0) {
+                            text += `_Aún no hay resultados computados en esta sesión._\n`;
+                        } else {
+                            top5.forEach((p, idx) => {
+                                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🔹';
+                                text += `${medal} #${idx + 1} *${p.name}* (${p.category}ª) ➔ *${p.pg} PG* | % Vic: *${p.winRate}%* | ${p.pts} pts (PJ: ${p.pj})\n`;
+                            });
+                        }
+                    } else if (scope === 'LAST_SESSION_ALL') {
+                        text += `\n📋 *TABLA COMPLETA DE LA ÚLTIMA JORNADA:*\n`;
+                        let list = [];
+                        if (state.activeSession) {
+                            list = state.players
+                                .filter(p => p.status !== 'DISABLED' || (p.sessionMatchesPlayed || 0) > 0)
+                                .map(p => {
+                                    const pj = p.sessionMatchesPlayed || 0;
+                                    const pg = p.sessionMatchesWon || 0;
+                                    return {
+                                        name: p.name,
+                                        category: p.category,
+                                        pj,
+                                        pg,
+                                        winRate: pj > 0 ? Math.round((pg / pj) * 100) : 0,
+                                        pts: pg * 3 + (pj - pg) * 1,
+                                        diff: (p.sessionGamesWon || 0) - (p.sessionGamesLost || 0)
+                                    };
+                                });
+                        } else if (state.pastSessions.length > 0 && state.pastSessions[0].participants) {
+                            list = state.pastSessions[0].participants.map(p => ({
+                                name: p.name,
+                                category: p.category,
+                                pj: p.pj || 0,
+                                pg: p.pg || 0,
+                                winRate: p.winRate || (p.pj ? Math.round((p.pg / p.pj) * 100) : 0),
+                                pts: p.points || 0,
+                                diff: p.diffGames || 0
+                            }));
+                        }
+
+                        const sorted = sortListByCriterion(list);
+                        if (sorted.length === 0) {
+                            text += `_Aún no hay resultados computados en esta sesión._\n`;
+                        } else {
+                            sorted.forEach((p, idx) => {
+                                text += `#${idx + 1} *${p.name}* (${p.category}ª) ➔ ${p.pg} PG | % Vic: ${p.winRate}% | ${p.pts} pts | PJ: ${p.pj} | Dif: ${p.diff > 0 ? '+' : ''}${p.diff}\n`;
+                            });
+                        }
+                    } else if (scope === 'MONTH_TOP5') {
+                        const currentMonth = new Date().toLocaleDateString([], { month: 'long', year: 'numeric' });
+                        text += `\n👑 *TOP 5 DEL RANKING MENSUAL (${currentMonth.toUpperCase()}):*\n`;
+                        const ranked = getRankingData();
+                        const sorted = sortListByCriterion(ranked.map(p => ({
+                            name: p.name,
+                            category: p.category,
+                            pj: p.pj,
+                            pg: p.pg,
+                            winRate: p.winRate,
+                            pts: p.points,
+                            diff: p.diffGames
+                        })));
+                        const top5 = sorted.slice(0, 5);
+
+                        if (top5.length === 0) {
+                            text += `_Sin partidos registrados en este mes._\n`;
+                        } else {
+                            top5.forEach((p, idx) => {
+                                const medal = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🔹';
+                                text += `${medal} #${idx + 1} *${p.name}* (${p.category}ª)\n   ↳ *${p.pg} PG* | % Vic: *${p.winRate}%* | ${p.pts} pts (PJ: ${p.pj})\n`;
+                            });
+                        }
+                    } else if (scope === 'MONTH_ALL') {
+                        const currentMonth = new Date().toLocaleDateString([], { month: 'long', year: 'numeric' });
+                        text += `\n📊 *RANKING MENSUAL COMPLETO (${currentMonth.toUpperCase()}):*\n`;
+                        const ranked = getRankingData();
+                        const sorted = sortListByCriterion(ranked.map(p => ({
+                            name: p.name,
+                            category: p.category,
+                            pj: p.pj,
+                            pg: p.pg,
+                            winRate: p.winRate,
+                            pts: p.points,
+                            diff: p.diffGames
+                        })));
+
+                        if (sorted.length === 0) {
+                            text += `_Sin partidos registrados en este mes._\n`;
+                        } else {
+                            sorted.forEach((p, idx) => {
+                                text += `#${idx + 1} *${p.name}* (${p.category}ª) ➔ ${p.pg} PG | % Vic: ${p.winRate}% | ${p.pts} pts | PJ: ${p.pj}\n`;
+                            });
+                        }
+                    }
+                }
+
+                text += `\n_Generado automáticamente desde Pádel Open Master_`;
+                const preview = document.getElementById('share-text-preview');
+                if (preview) preview.value = text;
+            };
+
+            window.copyShareText = function() {
+                const preview = document.getElementById('share-text-preview');
+                if (preview) {
+                    preview.select();
+                    document.execCommand('copy');
+                    showToast("¡Texto copiado al portapapeles!", "📋");
+                }
+            };
+
+            window.sendToWhatsAppDirect = function() {
+                const preview = document.getElementById('share-text-preview');
+                if (preview) {
+                    const encoded = encodeURIComponent(preview.value);
+                    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+                }
+            };
+
+            /* -------------------------------------------------------------
+               BACKUP & RESTORE (JSON & CSV)
+               ------------------------------------------------------------- */
+            window.openBackupModal = function() {
+                openModal('modal-backup');
+            };
+
+            window.exportBackupJSON = function() {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+                const a = document.createElement('a');
+                a.setAttribute("href", dataStr);
+                a.setAttribute("download", `padel_backup_${new Date().toISOString().split('T')[0]}.json`);
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                showToast("Copia de seguridad descargada en archivo JSON.", "📦");
+            };
+
+            window.importBackupJSON = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const imported = JSON.parse(evt.target.result);
+                        if (imported && Array.isArray(imported.players)) {
+                            state = imported;
+                            ensureCourtsInitialized();
+                            saveState();
+                            closeModal('modal-backup');
+                            renderAll();
+                            showToast("¡Base de datos restaurada correctamente!", "✅");
+                        } else {
+                            showToast("El archivo no tiene el formato correcto.", "⚠️");
+                        }
+                    } catch (err) {
+                        showToast("Error al procesar el archivo JSON.", "❌");
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            window.exportRankingCSV = function() {
+                const ranked = getRankingData();
+                let csv = "Puesto,Nombre,Genero,Categoria,Subcategoria,PJ,PG,PP,Porcentaje_Victorias,Games_Favor,Games_Contra,Dif_Games,Puntos\n";
+                ranked.forEach((r, idx) => {
+                    csv += `${idx + 1},"${r.name}",${r.gender},${r.category},${r.subcategory},${r.pj},${r.pg},${r.pp},${r.winRate}%,${r.gamesWon},${r.gamesLost},${r.diffGames},${r.points}\n`;
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute("href", url);
+                a.setAttribute("download", `ranking_padel_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                showToast("Ranking exportado a CSV.", "📊");
+            };
+
+            /* -------------------------------------------------------------
+               TAB NAVIGATION & MODAL HELPERS
+               ------------------------------------------------------------- */
+            window.switchTab = function(tabId) {
+                ['canchas', 'jugadores', 'ranking', 'jornadas'].forEach(t => {
+                    const content = document.getElementById(`tab-content-${t}`);
+                    const btn = document.getElementById(`tab-btn-${t}`);
+                    if (content) content.classList.add('hidden');
+                    if (btn) {
+                        btn.className = "tab-btn flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition";
+                    }
+                });
+
+                const activeContent = document.getElementById(`tab-content-${tabId}`);
+                const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+                if (activeContent) activeContent.classList.remove('hidden');
+                if (activeBtn) {
+                    activeBtn.className = "tab-btn flex items-center gap-2 px-4 py-2 rounded-xl transition bg-lime-500 text-slate-950 font-bold shadow-md shadow-lime-500/20";
+                }
+
+                if (tabId === 'canchas') renderCourts();
+                if (tabId === 'jugadores') renderPlayersTable();
+                if (tabId === 'ranking') renderRankingTable();
+                if (tabId === 'jornadas') renderPastSessions();
+            };
+
+            window.openModal = function(id) {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('hidden');
+            };
+
+            window.closeModal = function(id) {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            };
+
+            window.openConfirmDialog = function(title, message, onConfirm) {
+                const dialog = document.getElementById('modal-confirm-dialog');
+                const t = document.getElementById('confirm-dialog-title');
+                const m = document.getElementById('confirm-dialog-message');
+                const btn = document.getElementById('confirm-dialog-btn');
+                const cancelBtn = document.getElementById('confirm-dialog-cancel');
+
+                if (!dialog || !t || !m || !btn) return;
+                t.textContent = title;
+                m.textContent = message;
+
+                const close = () => dialog.classList.add('hidden');
+
+                cancelBtn.onclick = close;
+                btn.onclick = () => {
+                    close();
+                    if (typeof onConfirm === 'function') onConfirm();
+                };
+
+                dialog.classList.remove('hidden');
+            };
+
+            window.showToast = function(msg, icon = '✅') {
+                const toast = document.getElementById('toast-box');
+                const tText = document.getElementById('toast-text');
+                const tIcon = document.getElementById('toast-icon');
+                if (!toast || !tText) return;
+
+                tText.textContent = msg;
+                if (tIcon) tIcon.textContent = icon;
+
+                toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+                }, 3000);
+            };
+
+        })();
+    </script>
+</body>
+</html>
